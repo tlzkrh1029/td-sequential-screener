@@ -1,15 +1,24 @@
 // Download the whole daily OHLC history of the USD tickers in data/tickers.json over TradingView's chart
 // WebSocket, without a login, one file per ticker in data/daily:
-//   {id, d0, o, h, l, c}: index i is unix day d0 + i; null marks a day on which TradingView has no bar.
+//   {id, d0, o, h, l, c, m}: index i is unix day d0 + i; null marks a day on which TradingView has no bar.
+//   m = {d, o, h, l, c}: TradingView's own 1M bars of the closed months, fetched in the same pass; d[j] is the unix
+//   day of the first day of the month of the j-th bar. A 1M chart shows these, and they are not always the aggregate
+//   of the daily bars (they keep prices TradingView later revised away in its daily bars: CRYPTO:HUNTUSD 2026-10 low,
+//   CRYPTO:TDROPUSD 2026-10 close), so dashboard/bars.js builds the month timeframes from them. 1D and 1M are fetched
+//   one right after the other, because some histories come in two versions (CRYPTO:ZECUSD with or without the
+//   2023-01-31 spike, CRYPTO:RSRUSD, ...) and each request can get either.
 //
 // Based on wma0.3-screenshot/scripts/fetch-tv.mjs, changed so the TD counts can match the TradingView chart:
 // - Every run fetches every ticker's whole history again. Nothing is merged into older files, so each file is
 //   exactly what TradingView serves on the day of the run, revisions of old bars included.
 // - The daily bar still in progress is dropped: only bars of days before the run's UTC start day are written.
 //   One cutoff for the whole run, so a run that crosses midnight UTC stays consistent.
-// - Every bar is checked: its time must be 00:00 UTC, days strictly increasing, open/high/low/close finite.
-//   A ticker that fails a check keeps its previous file and is listed in _status.json.
-// - Changes to bars that were already stored (TradingView revisions) are counted per ticker in _status.json.
+// - Every bar is checked: its time must be 00:00 UTC, days strictly increasing, open/high/low/close finite; a 1M bar
+//   must start on the 1st of a month, and the 1M bar of the month in progress is dropped like the daily one.
+//   A ticker that fails a check, or whose 1D or 1M request fails, keeps its previous file and is listed in
+//   _status.json.
+// - Changes to bars that were already stored (TradingView revisions) are counted per ticker in _status.json, and
+//   so are closed months that have a 1M bar but no daily bar or the other way round (monthsVsDaily).
 //
 // Env:
 //   TICKERS_FILE  coins with resolved tickers (default data/tickers.json); the `usd` ticker of each coin is used
@@ -103,8 +112,9 @@ class TVClient {
 }
 
 let sessionSeq = 0;
-// Whole 1D history of one ticker: Map time -> [open, high, low, close] as TradingView sends them.
-async function fetchSeries(client, symbol) {
+// Whole history of one ticker in one resolution ('1D' or '1M'): Map time -> [open, high, low, close] as TradingView
+// sends them.
+async function fetchSeries(client, symbol, resolution) {
   const cs = `cs_td${++sessionSeq}`;
   const bars = new Map();
   const onData = (msg) => {
@@ -121,7 +131,7 @@ async function fetchSeries(client, symbol) {
     return undefined;
   };
   const completed = (ms) => {
-    const p = client.wait((msg) => failed(msg) ?? (msg.m === 'series_completed' && msg.p[0] === cs ? true : undefined), ms, `${symbol} data`);
+    const p = client.wait((msg) => failed(msg) ?? (msg.m === 'series_completed' && msg.p[0] === cs ? true : undefined), ms, `${symbol} ${resolution} data`);
     p.catch(() => {});
     return p;
   };
@@ -132,7 +142,7 @@ async function fetchSeries(client, symbol) {
     client.send('chart_create_session', [cs, '']);
     client.send('switch_timezone', [cs, 'Etc/UTC']);
     client.send('resolve_symbol', [cs, 'sds_sym_1', '=' + JSON.stringify({ symbol, adjustment: 'splits' })]);
-    client.send('create_series', [cs, 'sds_1', 's1', 'sds_sym_1', '1D', CHUNK, '']);
+    client.send('create_series', [cs, 'sds_1', 's1', 'sds_sym_1', resolution, CHUNK, '']);
     const meta = await resolved;
     await next;
     let added = bars.size >= CHUNK ? Infinity : 0;
@@ -174,6 +184,41 @@ export function toDaily(bars, cutoff) {
   return { daily: out, bars: kept.length, oddRanges };
 }
 
+// 1M bars -> m = {d, o, h, l, c} of the closed months (last day before cutoff), after checking every bar.
+export function toMonthly(bars, cutoff) {
+  const rows = [...bars.entries()].sort((a, b) => a[0] - b[0]);
+  const m = { d: [], o: [], h: [], l: [], c: [] };
+  let prevDay = -Infinity;
+  for (const [t, v] of rows) {
+    const date = new Date(t * 1000);
+    if (!Number.isInteger(t) || t % DAY !== 0 || date.getUTCDate() !== 1) throw new Error(`1M bar time ${t} is not 00:00 UTC on the 1st of a month`);
+    const d = t / DAY;
+    if (d <= prevDay) throw new Error(`1M bar times not increasing at ${t}`);
+    prevDay = d;
+    const monthEnd = Date.UTC(date.getUTCFullYear(), date.getUTCMonth() + 1, 1) / 1000 / DAY - 1;
+    if (monthEnd >= cutoff) continue; // the month still in progress (or in the future)
+    if (v.length < 4 || !v.every(Number.isFinite)) throw new Error(`1M bar ${date.toISOString().slice(0, 7)} has a missing value: ${JSON.stringify(v)}`);
+    m.d.push(d); m.o.push(v[0]); m.h.push(v[1]); m.l.push(v[2]); m.c.push(v[3]);
+  }
+  return m;
+}
+
+// Closed months (last day before cutoff) with a 1M bar but no daily bar, and with daily bars but no 1M bar, as
+// YYYY-MM lists (null when both agree).
+export function monthsVsDaily(daily, m, cutoff) {
+  const fromDaily = new Set();
+  for (let i = 0; i < daily.c.length; i++) {
+    if (daily.c[i] === null) continue;
+    const t = new Date((daily.d0 + i) * DAY * 1000), y = t.getUTCFullYear(), mo = t.getUTCMonth();
+    if (Date.UTC(y, mo + 1, 1) / 1000 / DAY - 1 < cutoff) fromDaily.add(Date.UTC(y, mo, 1) / 1000 / DAY);
+  }
+  const fromMonthly = new Set(m.d);
+  const iso = (d) => new Date(d * DAY * 1000).toISOString().slice(0, 7);
+  const only1M = m.d.filter((d) => !fromDaily.has(d)).map(iso);
+  const only1D = [...fromDaily].filter((d) => !fromMonthly.has(d)).sort((a, b) => a - b).map(iso);
+  return only1M.length || only1D.length ? { only1M, only1D } : null;
+}
+
 // Days whose stored bar changed, appeared or disappeared, compared with the previous file (the new last day is
 // not a revision).
 function revisions(prev, next) {
@@ -185,6 +230,19 @@ function revisions(prev, next) {
     if (['o', 'h', 'l', 'c'].some((k) => at(prev, k, d) !== at(next, k, d))) { changed++; first ??= d; }
   }
   return changed ? { changed, first: new Date(first * DAY * 1000).toISOString().slice(0, 10) } : null;
+}
+
+// Number of stored 1M bars (months) that changed or disappeared, compared with the previous file (null when none, or
+// when the previous file has no 1M bars).
+function monthRevisions(prev, next) {
+  if (!prev?.d) return null;
+  const at = new Map(next.d.map((d, j) => [d, [next.o[j], next.h[j], next.l[j], next.c[j]]]));
+  let changed = 0;
+  prev.d.forEach((d, j) => {
+    const v = at.get(d);
+    if (!v || v[0] !== prev.o[j] || v[1] !== prev.h[j] || v[2] !== prev.l[j] || v[3] !== prev.c[j]) changed++;
+  });
+  return changed || null;
 }
 
 async function main() {
@@ -201,10 +259,10 @@ async function main() {
     client.send('set_locale', ['en', 'US']);
     return client;
   }
-  async function fetchWithRetry(symbol) {
+  async function fetchWithRetry(symbol, resolution) {
     let last;
     for (let attempt = 0; attempt < 3; attempt++) {
-      try { return await fetchSeries(await connect(), symbol); } catch (err) {
+      try { return await fetchSeries(await connect(), symbol, resolution); } catch (err) {
         last = err;
         try { client?.ws.close(); } catch {}
         client = null;
@@ -215,7 +273,7 @@ async function main() {
   }
 
   await mkdir(OUT_DIR, { recursive: true });
-  const failed = [], revised = [], odd = [];
+  const failed = [], revised = [], odd = [], monthGaps = [];
   let ok = 0;
   const t0 = Date.now();
   for (const [k, symbol] of SYMBOLS.entries()) {
@@ -223,18 +281,25 @@ async function main() {
     let prev = null;
     try { prev = JSON.parse(await readFile(file, 'utf8')); } catch {}
     try {
-      const { meta, bars } = await fetchWithRetry(symbol);
+      const { meta, bars } = await fetchWithRetry(symbol, '1D');
       if (meta?.timezone && meta.timezone !== 'Etc/UTC') throw new Error(`symbol timezone ${meta.timezone}`);
       const { daily, bars: n, oddRanges } = toDaily(bars, CUTOFF);
+      const monthly = await fetchWithRetry(symbol, '1M');
+      if (monthly.meta?.timezone && monthly.meta.timezone !== 'Etc/UTC') throw new Error(`symbol timezone ${monthly.meta.timezone} (1M)`);
+      const m = toMonthly(monthly.bars, CUTOFF);
       const rev = revisions(prev, daily);
-      if (rev) revised.push({ id: symbol, ...rev });
+      const revMonths = monthRevisions(prev?.m, m);
+      if (rev || revMonths) revised.push({ id: symbol, ...(rev || { changed: 0 }), ...(revMonths ? { months: revMonths } : {}) });
       if (oddRanges) odd.push({ id: symbol, bars: oddRanges });
+      const gaps = monthsVsDaily(daily, m, CUTOFF);
+      if (gaps) monthGaps.push({ id: symbol, ...gaps });
       const tmp = file + '.tmp';
-      await writeFile(tmp, JSON.stringify({ id: symbol, ...daily }));
+      await writeFile(tmp, JSON.stringify({ id: symbol, ...daily, m }));
       await rename(tmp, file);
       ok++;
       const lastDay = new Date((daily.d0 + daily.c.length - 1) * DAY * 1000).toISOString().slice(0, 10);
-      console.log(`[${k + 1}/${SYMBOLS.length}] ${symbol}: ${n} bars to ${lastDay}${rev ? `, ${rev.changed} revised from ${rev.first}` : ''}`);
+      console.log(`[${k + 1}/${SYMBOLS.length}] ${symbol}: ${n} bars to ${lastDay}, ${m.d.length} months${rev ? `, ${rev.changed} revised from ${rev.first}` : ''}` +
+        `${revMonths ? `, ${revMonths} months revised` : ''}${gaps ? `, months only in 1M ${gaps.only1M.length} / only in 1D ${gaps.only1D.length}` : ''}`);
     } catch (err) {
       failed.push({ id: symbol, error: err.message });
       console.error(`[${k + 1}/${SYMBOLS.length}] ${symbol} failed (previous file kept): ${err.message}`);
@@ -255,10 +320,11 @@ async function main() {
   const status = {
     fetchedAt: startedAt.toISOString(), lastClosedDay: new Date((CUTOFF - 1) * DAY * 1000).toISOString().slice(0, 10),
     mode: 'full', loggedIn: false, seconds: Math.round((Date.now() - t0) / 1000),
-    total: SYMBOLS.length, ok, removed, pruneRefused, failed, revised, oddRanges: odd,
+    total: SYMBOLS.length, ok, removed, pruneRefused, failed, revised, oddRanges: odd, monthsVsDaily: monthGaps,
   };
   if (FROM_LIST) await writeFile(path.join(OUT_DIR, '_status.json'), JSON.stringify(status, null, 1));
-  console.log(`daily OHLC: ${ok} ok, ${failed.length} failed, ${revised.length} with revised bars, ${removed} old files removed, ${status.seconds}s`);
+  console.log(`daily OHLC: ${ok} ok, ${failed.length} failed, ${revised.length} with revised bars, ${monthGaps.length} with months only in 1M or 1D, ` +
+    `${removed} old files removed, ${status.seconds}s`);
   if (failed.some((f) => f.id === CANARY) || failed.length > SYMBOLS.length * MAX_FAILED || pruneRefused) process.exit(1);
 }
 

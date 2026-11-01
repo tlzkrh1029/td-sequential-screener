@@ -19,9 +19,16 @@ its default inputs) without a single exception.
   passing, including the golden case seen on the chart (CRYPTO:BTCUSD 2W, 2024-12-16, pink SELL `13x2` from the
   2021-11-08 and 2024-01-29 origins).
 - **Whole history on every run.** TD counts depend on every earlier bar, so `scripts/fetch-tv.mjs` refetches every
-  ticker's whole daily history each run. Never merge a recent window into older files: TradingView revises old bars
-  (RSR was rebuilt from 2019, AVU lost 270 days, last digits changed on ICX and ARPA), and the chart always shows
-  the revised bars.
+  ticker's whole history each run. Never merge a recent window into older files: TradingView revises old bars (AVU
+  lost 270 days, last digits changed on ICX and ALTL), and the chart always shows the current bars.
+- **Some histories come in two versions.** TradingView answers some tickers with one of two history versions, request
+  by request (seen on 2026-11-01: RSR, RVN, GHX, ARPA, BNB, USUAL, ZEC). Only RSR's 9s and 13s depend on the version
+  today. No port can choose the version the owner's chart receives, so such differences are reported, not fixed.
+- **Bars as the chart builds them.** Day timeframes (1D to 10D) and week timeframes are built from TradingView's
+  daily bars; month timeframes (1M to 12M) from TradingView's own 1M bars, fetched in the same pass and stored as `m`,
+  because a 1M chart shows TradingView's 1M series, which keeps prices later revised away in its daily bars (HUNT
+  2026-10 low, TDROP 2026-10 close), and TradingView's own 3M, 6M and 12M bars equal the aggregate of its 1M bars.
+  The bucketing (wma0.3-screenshot's keyFn) matched every one of 178,226 TradingView 1W/1M/3M/6M/12M bars.
 - **Closed bars only.** The daily bar still in progress at fetch time is dropped, and the engine runs on confirmed
   bars only (a timeframe bar is confirmed once its calendar bucket has ended), as the script does on the chart.
 - **No filled gaps, no trimmed history.** Days on which TradingView has no bar stay `null` and are not bars. Never
@@ -41,9 +48,10 @@ its default inputs) without a single exception.
 - **Credit CoinGecko.** The coin list, ranks and market caps come from CoinGecko through the WMA screener, so keep the
   linked "Data provided by CoinGecko" credit on the page.
 - **Custom timeframes need a login.** Anonymous requests get only standard resolutions (1D, 1W, 1M, 3M, 6M, 12M); 2D,
-  3W, 2M and the like fail with `custom_resolution`. The screener rebuilds every timeframe from 1D bars with the
-  bucketing of wma0.3-screenshot's engine; `verify/native/check-native-bars.mjs` compares the rebuilt standard
-  resolutions with TradingView's own bars.
+  3W, 2M and the like fail with `custom_resolution`. The screener rebuilds them with the bucketing of
+  wma0.3-screenshot's engine. `verify/native/check-native-bars.mjs` compares bars aggregated from 1D with
+  TradingView's own 1W/1M/3M/6M/12M bars (it still aggregates months from 1D on purpose, to show where TradingView's
+  1M series departs from its daily bars).
 - **Keep `data/daily` under 3,000 files.**
 - **Stale data must be loud.** `scripts/check-fresh.mjs` fails the daily run when the data stops moving. Do not
   weaken it to make a run pass.

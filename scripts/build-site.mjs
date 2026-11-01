@@ -1,11 +1,12 @@
 // Build the TD Sequential screener site from data/daily (written by scripts/fetch-tv.mjs).
 //
 // Every coin in data/universe.json is listed; its USD ticker comes from data/tickers.json. For each coin and each of
-// the 20 timeframes the bars are rebuilt from the daily OHLC (dashboard/bars.js) and TD Research v6 is counted on
-// the confirmed bars (dashboard/td-engine.js, the same code the page runs), with the indicator's default inputs.
+// the 20 timeframes the bars are rebuilt from the daily OHLC, the month timeframes from TradingView's own 1M bars
+// (dashboard/bars.js), and TD Research v6 is counted on the confirmed bars (dashboard/td-engine.js, the same code the
+// page runs), with the indicator's default inputs.
 // The screener needs only each coin's summary per timeframe, which goes into the page. The coin page needs the daily
-// OHLC, which goes into d/<n>.json files of --chunk coins each (fetched when a coin is opened; the page recounts
-// that coin in the browser with the same engine). The breadth board's counts go into b.json.
+// OHLC and the 1M bars, which go into d/<n>.json files of --chunk coins each (fetched when a coin is opened; the page
+// recounts that coin in the browser with the same engine). The breadth board's counts go into b.json.
 //
 // Output (default dist/site): index.html, b.json, d/0.json, d/1.json, ...
 // Usage: node scripts/build-site.mjs [outDir] [--daily-dir data/daily] [--chunk 3] [--fragment]
@@ -117,7 +118,9 @@ for (const u of universe.coins) {
       return summarize(bars, res);
     });
   }
-  coins.push({ coin, daily: daily && { d0: daily.d0, o: daily.o, h: daily.h, l: daily.l, c: daily.c } });
+  // the whole data file but its id: the daily OHLC plus TradingView's own 1M bars (m), from which dashboard/bars.js
+  // builds the month timeframes, so the page recounts the coin from exactly the bars counted here
+  coins.push({ coin, daily: daily && (({ id, ...rest }) => rest)(daily) });
 }
 console.log(`counted ${runs} coin-timeframes (${labels} labels) in ${((Date.now() - t0) / 1000).toFixed(1)}s`);
 

@@ -1,15 +1,66 @@
 {
- "fetchedAt": "2026-11-01T03:00:27.147Z",
+ "fetchedAt": "2026-11-01T04:29:49.609Z",
  "lastClosedDay": "2026-10-31",
  "mode": "full",
  "loggedIn": false,
- "seconds": 87,
+ "seconds": 170,
  "total": 563,
  "ok": 563,
  "removed": 0,
  "pruneRefused": 0,
  "failed": [],
- "revised": [],
+ "revised": [
+  {
+   "id": "CRYPTO:BNBUSD",
+   "changed": 95,
+   "first": "2021-09-29"
+  },
+  {
+   "id": "CRYPTO:RSRUSD",
+   "changed": 1223,
+   "first": "2019-05-24"
+  },
+  {
+   "id": "CRYPTO:RVNUSD",
+   "changed": 727,
+   "first": "2018-03-10"
+  },
+  {
+   "id": "CRYPTO:USUALUSD",
+   "changed": 32,
+   "first": "2024-11-15"
+  },
+  {
+   "id": "CRYPTO:HUNTUSD",
+   "changed": 1,
+   "first": "2026-10-28"
+  },
+  {
+   "id": "CRYPTO:ARPAUSD",
+   "changed": 127,
+   "first": "2024-07-04"
+  },
+  {
+   "id": "CRYPTO:GHXUSD",
+   "changed": 333,
+   "first": "2024-01-10"
+  },
+  {
+   "id": "CRYPTO:TDROPUSD",
+   "changed": 1,
+   "first": "2026-10-31"
+  },
+  {
+   "id": "CRYPTO:REIUSD",
+   "changed": 1,
+   "first": "2026-10-29"
+  },
+  {
+   "id": "CRYPTO:SUNDOGUSD",
+   "changed": 1,
+   "first": "2026-10-30"
+  }
+ ],
  "oddRanges": [
   {
    "id": "CRYPTO:MONADUSD",
@@ -19,5 +70,6 @@
    "id": "CRYPTO:LAGRUSD",
    "bars": 1
   }
- ]
+ ],
+ "monthsVsDaily": []
 }

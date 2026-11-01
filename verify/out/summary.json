@@ -1,0 +1,147 @@
+{
+ "generatedAt": "2026-11-01T04:49:49.278Z",
+ "runs": [
+  {
+   "name": "default",
+   "variant": null,
+   "options": {},
+   "tickers": "all",
+   "tfs": "all",
+   "seconds": {
+    "js": 7.1,
+    "py": 13
+   },
+   "files": 11260,
+   "mismatchedFiles": 0,
+   "kinds": {},
+   "confirmedBars": 2876544,
+   "labels": {
+    "S": 87494,
+    "I": 31908,
+    "X": 0,
+    "C": 95612
+   },
+   "mismatchedExamples": []
+  },
+  {
+   "name": "corrected",
+   "variant": "verify/variants/corrected.json",
+   "options": {
+    "originPolicy": "Newest",
+    "cancelTDST": true,
+    "seqFinal": "Close",
+    "comboFinal": "Close"
+   },
+   "tickers": 63,
+   "tfs": "all",
+   "seconds": {
+    "js": 1.1,
+    "py": 1.6
+   },
+   "files": 1260,
+   "mismatchedFiles": 0,
+   "kinds": {},
+   "confirmedBars": 351427,
+   "labels": {
+    "S": 10714,
+    "I": 2154,
+    "X": 0,
+    "C": 5085
+   },
+   "mismatchedExamples": []
+  },
+  {
+   "name": "display",
+   "variant": "verify/variants/display.json",
+   "options": {
+    "showCounts": true,
+    "showCancelMarks": true,
+    "showBackfill": true,
+    "newestCountsOnly": false,
+    "prefix": true
+   },
+   "tickers": 63,
+   "tfs": "all",
+   "seconds": {
+    "js": 1.7,
+    "py": 2.1
+   },
+   "files": 1260,
+   "mismatchedFiles": 0,
+   "kinds": {},
+   "confirmedBars": 351427,
+   "labels": {
+    "S": 10714,
+    "I": 267983,
+    "X": 14654,
+    "C": 11798
+   },
+   "mismatchedExamples": []
+  },
+  {
+   "name": "keep",
+   "variant": "verify/variants/keep.json",
+   "options": {
+    "originPolicy": "Keep active",
+    "rejectSmaller": true,
+    "enableAggSeq": true,
+    "seqQ85": true,
+    "aggQ85": true,
+    "maxOrigins": 3
+   },
+   "tickers": 63,
+   "tfs": "all",
+   "seconds": {
+    "js": 1.1,
+    "py": 1.7
+   },
+   "files": 1260,
+   "mismatchedFiles": 0,
+   "kinds": {},
+   "confirmedBars": 351427,
+   "labels": {
+    "S": 10714,
+    "I": 21731,
+    "X": 0,
+    "C": 9984
+   },
+   "mismatchedExamples": []
+  },
+  {
+   "name": "recycle",
+   "variant": "verify/variants/recycle.json",
+   "options": {
+    "originPolicy": "Recycle range",
+    "restart22": true,
+    "comboRelaxed": false,
+    "aggComboRelaxed": false,
+    "wrapSetup": false,
+    "setupNineOnly": false,
+    "cancelOpposite": false,
+    "showRefresh": false
+   },
+   "tickers": 63,
+   "tfs": "all",
+   "seconds": {
+    "js": 1.7,
+    "py": 2.2
+   },
+   "files": 1260,
+   "mismatchedFiles": 0,
+   "kinds": {},
+   "confirmedBars": 351427,
+   "labels": {
+    "S": 340692,
+    "I": 65551,
+    "X": 0,
+    "C": 7547
+   },
+   "mismatchedExamples": []
+  }
+ ],
+ "data": {
+  "fetchedAt": "2026-11-01T04:29:49.609Z",
+  "lastClosedDay": "2026-10-31"
+ },
+ "ok": true
+}
