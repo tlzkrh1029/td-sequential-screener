@@ -1,0 +1,23 @@
+{
+ "fetchedAt": "2026-11-01T03:00:27.147Z",
+ "lastClosedDay": "2026-10-31",
+ "mode": "full",
+ "loggedIn": false,
+ "seconds": 87,
+ "total": 563,
+ "ok": 563,
+ "removed": 0,
+ "pruneRefused": 0,
+ "failed": [],
+ "revised": [],
+ "oddRanges": [
+  {
+   "id": "CRYPTO:MONADUSD",
+   "bars": 1
+  },
+  {
+   "id": "CRYPTO:LAGRUSD",
+   "bars": 1
+  }
+ ]
+}

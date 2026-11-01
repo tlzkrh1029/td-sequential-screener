@@ -1,0 +1,14 @@
+{
+  "name": "td-sequential-screener",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "fetch": "node scripts/fetch-tv.mjs",
+    "build": "node scripts/build-site.mjs",
+    "test": "node --test test/"
+  },
+  "dependencies": {
+    "https-proxy-agent": "^7.0.6",
+    "ws": "^8.18.3"
+  }
+}
