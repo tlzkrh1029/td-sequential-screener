@@ -5,9 +5,10 @@
 // give long setups (raw 18, 22, 27), deferrals and 13xN; some series have gaps of a few days to a few hundred days, a
 // bar with high below its open or close, or end inside the bucket in progress. About half of the tickers also carry
 // 1M bars (m, as scripts/fetch-tv.mjs stores TradingView's own): the monthly aggregate of the daily bars with some
-// values changed, some months only in m or only in the daily bars, sometimes the month in progress. The last closed day
-// depends on the seed (a month end or a day inside a month). Every input of the script is drawn at random for each
-// setting (the script's defaults and the variants of verify/variants are always included).
+// values changed, some months only in m or only in the daily bars, sometimes the month in progress; about half carry
+// 1W bars (w) made the same way from the weekly aggregate. The last closed day depends on the seed (a month end, a
+// Sunday or a day inside a month or week). Every input of the script is drawn at random for each setting (the script's
+// defaults and the variants of verify/variants are always included).
 // Both CLIs run on a synthetic data folder for every setting and their dumps are compared byte for byte.
 //
 // Usage: node verify/fuzz.mjs [--seed <n>] [--tickers <n>] [--settings <n>] [--work <dir>] [--tfs <tf,tf>]
@@ -71,32 +72,36 @@ function series() {
   // the series must start and end with a bar, like the fetched files
   while (c.length && c.at(-1) === null) { o.pop(); h.pop(); l.pop(); c.pop(); }
   const out = { d0, o, h, l, c };
-  if (chance(0.5)) out.m = monthly(out, tick);
+  if (chance(0.5)) out.m = native(out, tick, monthStart, monthEnd);
+  if (chance(0.5)) out.w = native(out, tick, weekStart, (ws) => ws + 6);
   return out;
 }
 
-// 1M bars for a daily series: its monthly aggregate over the closed months, with changes.
-function monthly(daily, tick) {
-  const monthStart = (d) => { const t = new Date(d * DAY); return Date.UTC(t.getUTCFullYear(), t.getUTCMonth(), 1) / DAY; };
-  const monthEnd = (ms) => { const t = new Date(ms * DAY); return Date.UTC(t.getUTCFullYear(), t.getUTCMonth() + 1, 1) / DAY - 1; };
-  const months = new Map();
+const monthStart = (d) => { const t = new Date(d * DAY); return Date.UTC(t.getUTCFullYear(), t.getUTCMonth(), 1) / DAY; };
+const monthEnd = (ms) => { const t = new Date(ms * DAY); return Date.UTC(t.getUTCFullYear(), t.getUTCMonth() + 1, 1) / DAY - 1; };
+const weekStart = (d) => Math.floor((d + 3) / 7) * 7 - 3; // the Monday of the week of d (unix day 4 is a Monday)
+
+// 1M bars (or 1W bars) for a daily series: its monthly (weekly) aggregate over the closed months (weeks), with
+// changes. startOf(d) = the first day of the month (Monday of the week) of day d, endOf(s) = its last day.
+function native(daily, tick, startOf, endOf) {
+  const groups = new Map();
   for (let i = 0; i < daily.c.length; i++) {
     if (daily.c[i] === null) continue;
-    const ms = monthStart(daily.d0 + i);
-    const g = months.get(ms);
-    if (!g) months.set(ms, [daily.o[i], daily.h[i], daily.l[i], daily.c[i]]);
+    const ms = startOf(daily.d0 + i);
+    const g = groups.get(ms);
+    if (!g) groups.set(ms, [daily.o[i], daily.h[i], daily.l[i], daily.c[i]]);
     else { g[1] = Math.max(g[1], daily.h[i]); g[2] = Math.min(g[2], daily.l[i]); g[3] = daily.c[i]; }
   }
-  const inProgress = chance(0.2); // keep the month in progress (the fetcher drops it; the ports must ignore it)
-  // a month without daily bars (inside a gap or before the first daily bar) that has a 1M bar
+  const inProgress = chance(0.2); // keep the month / week in progress (the fetcher drops it; the ports must ignore it)
+  // a month / week without daily bars (inside a gap or before the first daily bar) that has a native bar
   if (chance(0.15)) {
-    const ms = monthStart(daily.d0 - int(1, 60));
-    if (!months.has(ms)) months.set(ms, [daily.o[0], daily.h[0] + tick, daily.l[0], daily.c[0]]);
+    const ms = startOf(daily.d0 - int(1, 60));
+    if (!groups.has(ms)) groups.set(ms, [daily.o[0], daily.h[0] + tick, daily.l[0], daily.c[0]]);
   }
   const m = { d: [], o: [], h: [], l: [], c: [] };
-  for (const [ms, v] of [...months.entries()].sort((a, b) => a[0] - b[0])) {
-    if (monthEnd(ms) > LAST_CLOSED && !inProgress) continue;
-    if (chance(0.03)) continue; // a month with daily bars but no 1M bar
+  for (const [ms, v] of [...groups.entries()].sort((a, b) => a[0] - b[0])) {
+    if (endOf(ms) > LAST_CLOSED && !inProgress) continue;
+    if (chance(0.03)) continue; // a month / week with daily bars but no native bar
     const w = v.slice();
     if (chance(0.08)) w[1] += tick * int(1, 20);
     if (chance(0.08)) w[2] = Math.max(tick, w[2] - tick * int(1, 20));

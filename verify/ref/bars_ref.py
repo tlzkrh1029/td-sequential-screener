@@ -16,7 +16,10 @@ Written independently of the JavaScript port, from two sources only:
   * and, for the month timeframes (1M-12M), the native-bar check of 2026-11-01 (TradingView's month
     bars follow its own 1M bars): when the file holds TradingView's 1M bars of the closed
     months, m = {d, o, h, l, c} with d[j] the unix day of the first day of the month, the same rules
-    apply with those 1M bars in place of the daily bars (see build_bars).
+    apply with those 1M bars in place of the daily bars (see build_bars);
+  * and likewise for the week timeframes (1W, 2W, 3W): when the file holds TradingView's 1W bars of
+    the closed weeks, w = {d, o, h, l, c} with d[j] the unix day of the Monday of the week, the same
+    rules apply with those 1W bars in place of the daily bars.
 
 Unix days are integers counted from 1970-01-01 UTC.
 """
@@ -172,6 +175,31 @@ def monthly_rows(daily):
         yield (dj,) + vals
 
 
+def weekly_rows(daily):
+    """Yield (day, o, h, l, c) for every TradingView 1W bar in daily['w'], ascending.
+
+    daily['w'] = {d, o, h, l, c}: TradingView's own 1W bars of the closed weeks, as scripts/fetch-tv.mjs
+    stores them; d[j] is the unix day of the Monday of the j-th bar.
+    """
+    w = daily['w']
+    d, o, h, l, c = w['d'], w['o'], w['h'], w['l'], w['c']
+    if not (len(d) == len(o) == len(h) == len(l) == len(c)):
+        raise ValueError('%s: w.d/o/h/l/c lengths differ' % daily.get('id'))
+    prev = None
+    for j in range(len(d)):
+        dj = d[j]
+        if (not isinstance(dj, int) or isinstance(dj, bool) or day_to_date(dj).weekday() != 0
+                or (prev is not None and dj <= prev)):
+            raise ValueError('%s: w.d[%d] = %r is not a Monday after the previous one'
+                             % (daily.get('id'), j, dj))
+        vals = (o[j], h[j], l[j], c[j])
+        if any(v is None or isinstance(v, bool) or not isinstance(v, (int, float)) or not math.isfinite(v)
+               for v in vals):
+            raise ValueError('%s: 1W bar %s has a missing value' % (daily.get('id'), iso(dj)))
+        prev = dj
+        yield (dj,) + vals
+
+
 def build_bars(daily, tf):
     """All bars of one timeframe (confirmed or not), in time order.
 
@@ -181,10 +209,20 @@ def build_bars(daily, tf):
     version of their daily bars); TradingView's own 3M/6M/12M equal the aggregate of its 1M bars
     (verify/native/check-native-bars.mjs). The buckets and the rules are the same, with 1M bars in place of
     daily bars: first/last are then the first days of the months of the bucket's first/last 1M bar.
+    Week timeframes are built the same way from TradingView's own 1W bars when the file has them
+    (daily['w']; its open week of 2026-10-26 had a CRYPTO:HUNTUSD low and a CRYPTO:SUNDOGUSD high that the
+    daily bars of the same fetch did not have); 2W/3W are taken to be built from the 1W bars, as 3M/6M/12M
+    are from the 1M bars.
+    first/last are then the Mondays of the bucket's first/last 1W bar.
     """
     key = key_fn(tf)
     _k, unit = parse_tf(tf)
-    rows = monthly_rows(daily) if unit == 'M' and daily.get('m') is not None else daily_rows(daily)
+    if unit == 'M' and daily.get('m') is not None:
+        rows = monthly_rows(daily)
+    elif unit == 'W' and daily.get('w') is not None:
+        rows = weekly_rows(daily)
+    else:
+        rows = daily_rows(daily)
     bars = []
     cur = None
     cur_key = None

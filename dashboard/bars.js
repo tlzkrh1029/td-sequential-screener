@@ -1,5 +1,5 @@
-// Timeframe bars rebuilt from TradingView daily bars (month timeframes from TradingView's own 1M bars, when the data
-// file has them), the input of the TD engine (dashboard/td-engine.js).
+// Timeframe bars rebuilt from TradingView daily bars (week timeframes from TradingView's own 1W bars and month
+// timeframes from its own 1M bars, when the data file has them), the input of the TD engine (dashboard/td-engine.js).
 // Shared by the Node build and the screener page, which inlines it: plain ES module, no DOM, no Node APIs.
 //
 // Buckets are the WMA screener's keyFn (wma0.3-screenshot/dashboard/engine.js lines 16-34), which was checked
@@ -67,9 +67,11 @@ export function bucketFn(tf) {
 }
 
 // Bars of one timeframe from one ticker's data file, in one pass over the daily arrays.
-//   daily          {d0, o, h, l, c[, m]}: index i is unix day d0 + i; null in all four on a day without a daily bar.
+//   daily          {d0, o, h, l, c[, m][, w]}: index i is unix day d0 + i; null in all four on a day without a daily bar.
 //                  m (optional) = TradingView's own 1M bars of the closed months, {d, o, h, l, c}: d[j] is the unix
 //                  day of the first day of the month of the j-th bar (scripts/fetch-tv.mjs)
+//                  w (optional) = TradingView's own 1W bars of the closed weeks, {d, o, h, l, c}: d[j] is the unix
+//                  day of the Monday of the j-th bar
 //   tf             one of TFS
 //   lastClosedDay  unix day of the last closed daily bar; daily data after it is ignored
 // A bar is confirmed when its bucket's last calendar day is <= lastClosedDay. Only confirmed bars go into the arrays
@@ -84,25 +86,35 @@ export function bucketFn(tf) {
 // compared (verify/native/check-native-bars.mjs). So the confirmed bars are aggregated from the 1M bars instead, with
 // the same buckets and rules: a bucket with a 1M bar is a bar, o = open of its first 1M bar, h = highest high,
 // l = lowest low, c = close of its last 1M bar, and first / last = first day of the month of its first / last 1M bar.
+// Week timeframes (1W, 2W, 3W) with `w`, likewise from TradingView's own 1W bars: a 1W chart shows them, they equalled
+// the daily aggregate on every closed week of the native check, but TradingView's open week of 2026-10-26 had values
+// that no daily bar of the same fetch had (CRYPTO:HUNTUSD low 0.082473; CRYPTO:SUNDOGUSD high 0.0015266, an older
+// version of its 2026-10-30 daily high), the lag the 1M bars show; 2W and 3W are taken to be built by TradingView from
+// its 1W bars, as its 3M, 6M and 12M are from its 1M bars. A bucket with a 1W bar is a bar; first / last = the Monday
+// of its first / last 1W bar.
 // `partial` (display only; the bar in progress never reaches the engine) still comes from the daily bars, since the
-// 1M bar of the month in progress is not stored.
+// 1M bar of the month in progress and the 1W bar of the week in progress are not stored.
 export function buildBars(daily, tf, lastClosedDay) {
   const out = buildDailyBars(daily, tf, lastClosedDay);
-  if (daily.m == null || !tf.endsWith('M')) return out;
-  return { ...buildMonthBars(daily.m, tf, lastClosedDay), partial: out.partial };
+  const own = tf.endsWith('M') ? daily.m : tf.endsWith('W') ? daily.w : null;
+  if (own == null) return out;
+  return { ...buildNativeBars(own, tf.endsWith('M') ? '1M' : '1W', tf, lastClosedDay), partial: out.partial };
 }
 
-// The confirmed bars of a month timeframe from TradingView's own 1M bars m = {d, o, h, l, c} (see buildBars).
-function buildMonthBars(m, tf, lastClosedDay) {
+// The confirmed bars of a month or week timeframe from TradingView's own 1M or 1W bars own = {d, o, h, l, c}
+// (unit '1M': m, d[j] the first day of a month; unit '1W': w, d[j] a Monday; see buildBars).
+function buildNativeBars(own, unit, tf, lastClosedDay) {
   const bounds = bucketFn(tf), se = [0, 0];
-  const D = m.d, O = m.o, H = m.h, L = m.l, C = m.c, len = D.length;
-  if (![O, H, L, C].every((a) => a.length === len)) throw new Error('m: d, o, h, l and c must have the same length');
+  const D = own.d, O = own.o, H = own.h, L = own.l, C = own.c, len = D.length;
+  const name = unit === '1M' ? 'm' : 'w';
+  if (![O, H, L, C].every((a) => a.length === len)) throw new Error(`${name}: d, o, h, l and c must have the same length`);
   for (let j = 0; j < len; j++) {
     const t = new Date(D[j] * DAYMS);
-    if (!Number.isInteger(D[j]) || t.getUTCDate() !== 1 || (j > 0 && D[j] <= D[j - 1])) {
-      throw new Error(`m.d[${j}] = ${D[j]}: 1M bar days must be first days of months, strictly increasing`);
+    const aligned = unit === '1M' ? t.getUTCDate() === 1 : t.getUTCDay() === 1;
+    if (!Number.isInteger(D[j]) || !aligned || (j > 0 && D[j] <= D[j - 1])) {
+      throw new Error(`${name}.d[${j}] = ${D[j]}: ${unit} bar days must be ${unit === '1M' ? 'first days of months' : 'Mondays'}, strictly increasing`);
     }
-    if (![O[j], H[j], L[j], C[j]].every(Number.isFinite)) throw new Error(`m: 1M bar ${isoOfDay(D[j])} has a missing value`);
+    if (![O[j], H[j], L[j], C[j]].every(Number.isFinite)) throw new Error(`${name}: ${unit} bar ${isoOfDay(D[j])} has a missing value`);
   }
   const start = new Int32Array(len), end = new Int32Array(len), first = new Int32Array(len), last = new Int32Array(len);
   const o = new Float64Array(len), h = new Float64Array(len), l = new Float64Array(len), c = new Float64Array(len);

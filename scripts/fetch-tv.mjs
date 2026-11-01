@@ -1,12 +1,17 @@
 // Download the whole daily OHLC history of the USD tickers in data/tickers.json over TradingView's chart
 // WebSocket, without a login, one file per ticker in data/daily:
-//   {id, d0, o, h, l, c, m}: index i is unix day d0 + i; null marks a day on which TradingView has no bar.
+//   {id, d0, o, h, l, c, m, w}: index i is unix day d0 + i; null marks a day on which TradingView has no bar.
 //   m = {d, o, h, l, c}: TradingView's own 1M bars of the closed months, fetched in the same pass; d[j] is the unix
 //   day of the first day of the month of the j-th bar. A 1M chart shows these, and they are not always the aggregate
 //   of the daily bars (they keep prices TradingView later revised away in its daily bars: CRYPTO:HUNTUSD 2026-10 low,
-//   CRYPTO:TDROPUSD 2026-10 close), so dashboard/bars.js builds the month timeframes from them. 1D and 1M are fetched
-//   one right after the other, because some histories come in two versions (CRYPTO:ZECUSD with or without the
-//   2023-01-31 spike, CRYPTO:RSRUSD, ...) and each request can get either.
+//   CRYPTO:TDROPUSD 2026-10 close), so dashboard/bars.js builds the month timeframes from them.
+//   w = {d, o, h, l, c}: TradingView's own 1W bars of the closed weeks, likewise; d[j] is the unix day of the Monday
+//   of the j-th bar. They lag behind revisions of the daily bars the same way (the open week of 2026-10-26:
+//   CRYPTO:HUNTUSD low 0.082473, CRYPTO:SUNDOGUSD high 0.0015266, in no daily bar of that fetch), so the week
+//   timeframes are built from them. Some histories come in two versions for 1W too: on 2026-11-01 one fetch got
+//   CRYPTO:AVUUSD's 1D with and its 1W without 37 weeks of 2024-09 .. 2025-05 (weeksVsDaily reports such a fetch). 1D, 1M and 1W are fetched one right after the other, because some histories come
+//   in two versions (CRYPTO:ZECUSD with or without the 2023-01-31 spike, CRYPTO:RSRUSD, ...) and each request can get
+//   either.
 //
 // Based on wma0.3-screenshot/scripts/fetch-tv.mjs, changed so the TD counts can match the TradingView chart:
 // - Every run fetches every ticker's whole history again. Nothing is merged into older files, so each file is
@@ -14,11 +19,12 @@
 // - The daily bar still in progress is dropped: only bars of days before the run's UTC start day are written.
 //   One cutoff for the whole run, so a run that crosses midnight UTC stays consistent.
 // - Every bar is checked: its time must be 00:00 UTC, days strictly increasing, open/high/low/close finite; a 1M bar
-//   must start on the 1st of a month, and the 1M bar of the month in progress is dropped like the daily one.
-//   A ticker that fails a check, or whose 1D or 1M request fails, keeps its previous file and is listed in
-//   _status.json.
-// - Changes to bars that were already stored (TradingView revisions) are counted per ticker in _status.json, and
-//   so are closed months that have a 1M bar but no daily bar or the other way round (monthsVsDaily).
+//   must start on the 1st of a month and a 1W bar on a Monday, and the 1M bar of the month in progress and the 1W
+//   bar of the week in progress are dropped like the daily one. A ticker that fails a check, or whose 1D, 1M or 1W
+//   request fails, keeps its previous file and is listed in _status.json.
+// - Changes to bars that were already stored (TradingView revisions) are counted per ticker in _status.json (days,
+//   months, weeks), and so are closed months and weeks that have a 1M / 1W bar but no daily bar or the other way
+//   round (monthsVsDaily, weeksVsDaily).
 //
 // Env:
 //   TICKERS_FILE  coins with resolved tickers (default data/tickers.json); the `usd` ticker of each coin is used
@@ -112,8 +118,8 @@ class TVClient {
 }
 
 let sessionSeq = 0;
-// Whole history of one ticker in one resolution ('1D' or '1M'): Map time -> [open, high, low, close] as TradingView
-// sends them.
+// Whole history of one ticker in one resolution ('1D', '1M' or '1W'): Map time -> [open, high, low, close] as
+// TradingView sends them.
 async function fetchSeries(client, symbol, resolution) {
   const cs = `cs_td${++sessionSeq}`;
   const bars = new Map();
@@ -203,6 +209,23 @@ export function toMonthly(bars, cutoff) {
   return m;
 }
 
+// 1W bars -> w = {d, o, h, l, c} of the closed weeks (Sunday before cutoff), after checking every bar.
+export function toWeekly(bars, cutoff) {
+  const rows = [...bars.entries()].sort((a, b) => a[0] - b[0]);
+  const w = { d: [], o: [], h: [], l: [], c: [] };
+  let prevDay = -Infinity;
+  for (const [t, v] of rows) {
+    if (!Number.isInteger(t) || t % DAY !== 0 || new Date(t * 1000).getUTCDay() !== 1) throw new Error(`1W bar time ${t} is not 00:00 UTC on a Monday`);
+    const d = t / DAY;
+    if (d <= prevDay) throw new Error(`1W bar times not increasing at ${t}`);
+    prevDay = d;
+    if (d + 6 >= cutoff) continue; // the week still in progress (its Sunday is not closed), or in the future
+    if (v.length < 4 || !v.every(Number.isFinite)) throw new Error(`1W bar ${new Date(t * 1000).toISOString().slice(0, 10)} has a missing value: ${JSON.stringify(v)}`);
+    w.d.push(d); w.o.push(v[0]); w.h.push(v[1]); w.l.push(v[2]); w.c.push(v[3]);
+  }
+  return w;
+}
+
 // Closed months (last day before cutoff) with a 1M bar but no daily bar, and with daily bars but no 1M bar, as
 // YYYY-MM lists (null when both agree).
 export function monthsVsDaily(daily, m, cutoff) {
@@ -219,6 +242,22 @@ export function monthsVsDaily(daily, m, cutoff) {
   return only1M.length || only1D.length ? { only1M, only1D } : null;
 }
 
+// Closed weeks (Sunday before cutoff) with a 1W bar but no daily bar, and with daily bars but no 1W bar, as lists of
+// their Mondays (YYYY-MM-DD; null when both agree).
+export function weeksVsDaily(daily, w, cutoff) {
+  const fromDaily = new Set();
+  for (let i = 0; i < daily.c.length; i++) {
+    if (daily.c[i] === null) continue;
+    const d = daily.d0 + i, monday = Math.floor((d + 3) / 7) * 7 - 3; // unix day 4 (1970-01-05) is a Monday
+    if (monday + 6 < cutoff) fromDaily.add(monday);
+  }
+  const fromWeekly = new Set(w.d);
+  const iso = (d) => new Date(d * DAY * 1000).toISOString().slice(0, 10);
+  const only1W = w.d.filter((d) => !fromDaily.has(d)).map(iso);
+  const only1D = [...fromDaily].filter((d) => !fromWeekly.has(d)).sort((a, b) => a - b).map(iso);
+  return only1W.length || only1D.length ? { only1W, only1D } : null;
+}
+
 // Days whose stored bar changed, appeared or disappeared, compared with the previous file (the new last day is
 // not a revision).
 function revisions(prev, next) {
@@ -232,9 +271,9 @@ function revisions(prev, next) {
   return changed ? { changed, first: new Date(first * DAY * 1000).toISOString().slice(0, 10) } : null;
 }
 
-// Number of stored 1M bars (months) that changed or disappeared, compared with the previous file (null when none, or
-// when the previous file has no 1M bars).
-function monthRevisions(prev, next) {
+// Number of stored 1M bars (months) or 1W bars (weeks) that changed or disappeared, compared with the previous file
+// (null when none, or when the previous file has no such bars).
+export function barRevisions(prev, next) {
   if (!prev?.d) return null;
   const at = new Map(next.d.map((d, j) => [d, [next.o[j], next.h[j], next.l[j], next.c[j]]]));
   let changed = 0;
@@ -273,7 +312,7 @@ async function main() {
   }
 
   await mkdir(OUT_DIR, { recursive: true });
-  const failed = [], revised = [], odd = [], monthGaps = [];
+  const failed = [], revised = [], odd = [], monthGaps = [], weekGaps = [];
   let ok = 0;
   const t0 = Date.now();
   for (const [k, symbol] of SYMBOLS.entries()) {
@@ -287,19 +326,29 @@ async function main() {
       const monthly = await fetchWithRetry(symbol, '1M');
       if (monthly.meta?.timezone && monthly.meta.timezone !== 'Etc/UTC') throw new Error(`symbol timezone ${monthly.meta.timezone} (1M)`);
       const m = toMonthly(monthly.bars, CUTOFF);
+      const weekly = await fetchWithRetry(symbol, '1W');
+      if (weekly.meta?.timezone && weekly.meta.timezone !== 'Etc/UTC') throw new Error(`symbol timezone ${weekly.meta.timezone} (1W)`);
+      const w = toWeekly(weekly.bars, CUTOFF);
       const rev = revisions(prev, daily);
-      const revMonths = monthRevisions(prev?.m, m);
-      if (rev || revMonths) revised.push({ id: symbol, ...(rev || { changed: 0 }), ...(revMonths ? { months: revMonths } : {}) });
+      const revMonths = barRevisions(prev?.m, m);
+      const revWeeks = barRevisions(prev?.w, w);
+      if (rev || revMonths || revWeeks) {
+        revised.push({ id: symbol, ...(rev || { changed: 0 }), ...(revMonths ? { months: revMonths } : {}), ...(revWeeks ? { weeks: revWeeks } : {}) });
+      }
       if (oddRanges) odd.push({ id: symbol, bars: oddRanges });
       const gaps = monthsVsDaily(daily, m, CUTOFF);
       if (gaps) monthGaps.push({ id: symbol, ...gaps });
+      const wgaps = weeksVsDaily(daily, w, CUTOFF);
+      if (wgaps) weekGaps.push({ id: symbol, ...wgaps });
       const tmp = file + '.tmp';
-      await writeFile(tmp, JSON.stringify({ id: symbol, ...daily, m }));
+      await writeFile(tmp, JSON.stringify({ id: symbol, ...daily, m, w }));
       await rename(tmp, file);
       ok++;
       const lastDay = new Date((daily.d0 + daily.c.length - 1) * DAY * 1000).toISOString().slice(0, 10);
-      console.log(`[${k + 1}/${SYMBOLS.length}] ${symbol}: ${n} bars to ${lastDay}, ${m.d.length} months${rev ? `, ${rev.changed} revised from ${rev.first}` : ''}` +
-        `${revMonths ? `, ${revMonths} months revised` : ''}${gaps ? `, months only in 1M ${gaps.only1M.length} / only in 1D ${gaps.only1D.length}` : ''}`);
+      console.log(`[${k + 1}/${SYMBOLS.length}] ${symbol}: ${n} bars to ${lastDay}, ${m.d.length} months, ${w.d.length} weeks` +
+        `${rev ? `, ${rev.changed} revised from ${rev.first}` : ''}${revMonths ? `, ${revMonths} months revised` : ''}${revWeeks ? `, ${revWeeks} weeks revised` : ''}` +
+        `${gaps ? `, months only in 1M ${gaps.only1M.length} / only in 1D ${gaps.only1D.length}` : ''}` +
+        `${wgaps ? `, weeks only in 1W ${wgaps.only1W.length} / only in 1D ${wgaps.only1D.length}` : ''}`);
     } catch (err) {
       failed.push({ id: symbol, error: err.message });
       console.error(`[${k + 1}/${SYMBOLS.length}] ${symbol} failed (previous file kept): ${err.message}`);
@@ -320,11 +369,11 @@ async function main() {
   const status = {
     fetchedAt: startedAt.toISOString(), lastClosedDay: new Date((CUTOFF - 1) * DAY * 1000).toISOString().slice(0, 10),
     mode: 'full', loggedIn: false, seconds: Math.round((Date.now() - t0) / 1000),
-    total: SYMBOLS.length, ok, removed, pruneRefused, failed, revised, oddRanges: odd, monthsVsDaily: monthGaps,
+    total: SYMBOLS.length, ok, removed, pruneRefused, failed, revised, oddRanges: odd, monthsVsDaily: monthGaps, weeksVsDaily: weekGaps,
   };
   if (FROM_LIST) await writeFile(path.join(OUT_DIR, '_status.json'), JSON.stringify(status, null, 1));
   console.log(`daily OHLC: ${ok} ok, ${failed.length} failed, ${revised.length} with revised bars, ${monthGaps.length} with months only in 1M or 1D, ` +
-    `${removed} old files removed, ${status.seconds}s`);
+    `${weekGaps.length} with weeks only in 1W or 1D, ${removed} old files removed, ${status.seconds}s`);
   if (failed.some((f) => f.id === CANARY) || failed.length > SYMBOLS.length * MAX_FAILED || pruneRefused) process.exit(1);
 }
 

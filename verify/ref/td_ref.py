@@ -690,6 +690,8 @@ def _process_ticker(job):
     counts = collections.Counter()
     if daily.get('m') is None and any(tf.endswith('M') for tf in tfs):
         counts['noMonthly'] += 1      # month timeframes rebuilt from the daily bars
+    if daily.get('w') is None and any(tf.endswith('W') for tf in tfs):
+        counts['noWeekly'] += 1       # week timeframes rebuilt from the daily bars
     for tf in tfs:
         bars = bars_ref.confirmed_prefix(bars_ref.build_bars(daily, tf), last_closed_day)
         engine = run_bars(bars, opts)
@@ -772,6 +774,9 @@ def main(argv=None):
     if total['noMonthly']:
         sys.stderr.write('%d tickers without TradingView 1M bars (m): month timeframes rebuilt from 1D\n'
                          % total['noMonthly'])
+    if total['noWeekly']:
+        sys.stderr.write('%d tickers without TradingView 1W bars (w): week timeframes rebuilt from 1D\n'
+                         % total['noWeekly'])
     sys.stdout.write('lastClosedDay %s, out %s, %.1f s wall (%d jobs); slowest ticker %s %.1f s\n'
                      % (bars_ref.iso(last_closed_day), args.out, elapsed, args.jobs,
                         slowest[0][1] if slowest else '-', slowest[0][0] if slowest else 0.0))

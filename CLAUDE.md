@@ -22,12 +22,16 @@ its default inputs) without a single exception.
   ticker's whole history each run. Never merge a recent window into older files: TradingView revises old bars (AVU
   lost 270 days, last digits changed on ICX and ALTL), and the chart always shows the current bars.
 - **Some histories come in two versions.** TradingView answers some tickers with one of two history versions, request
-  by request (seen on 2026-11-01: RSR, RVN, GHX, ARPA, BNB, USUAL, ZEC). Only RSR's 9s and 13s depend on the version
-  today. No port can choose the version the owner's chart receives, so such differences are reported, not fixed.
-- **Bars as the chart builds them.** Day timeframes (1D to 10D) and week timeframes are built from TradingView's
-  daily bars; month timeframes (1M to 12M) from TradingView's own 1M bars, fetched in the same pass and stored as `m`,
-  because a 1M chart shows TradingView's 1M series, which keeps prices later revised away in its daily bars (HUNT
-  2026-10 low, TDROP 2026-10 close), and TradingView's own 3M, 6M and 12M bars equal the aggregate of its 1M bars.
+  by request (seen on 2026-11-01: RSR, RVN, GHX, ARPA, BNB, USUAL, ZEC, AVU; AVU's 1D and 1W can even come from
+  different versions in one pass, which `weeksVsDaily` in `_status.json` reports). The 9s and 13s of RSR and AVU
+  depend on the version today. No port can choose the version the owner's chart receives, so such differences are
+  reported, not fixed.
+- **Bars as the chart builds them.** Day timeframes (1D to 10D) are built from TradingView's daily bars; week
+  timeframes (1W, 2W, 3W) from TradingView's own 1W bars and month timeframes (1M to 12M) from its own 1M bars, both
+  fetched in the same pass and stored as `w` and `m`, because a 1W or 1M chart shows TradingView's own series, which
+  keeps prices later revised away in its daily bars (1M: HUNT 2026-10 low, TDROP 2026-10 close; 1W: HUNT low and
+  SUNDOG high of the week of 2026-10-26). TradingView's own 3M, 6M and 12M bars equal the aggregate of its 1M bars;
+  2W and 3W (custom resolutions, not fetchable anonymously) are taken to be built from its 1W bars the same way.
   The bucketing (wma0.3-screenshot's keyFn) matched every one of 178,226 TradingView 1W/1M/3M/6M/12M bars.
 - **Closed bars only.** The daily bar still in progress at fetch time is dropped, and the engine runs on confirmed
   bars only (a timeframe bar is confirmed once its calendar bucket has ended), as the script does on the chart.

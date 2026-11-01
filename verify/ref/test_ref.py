@@ -488,6 +488,69 @@ class Bars(unittest.TestCase):
             with self.assertRaises(ValueError):
                 bars_ref.build_bars({**daily, 'm': bad}, '1M')
 
+    def test_week_timeframes_from_tradingview_1w_bars(self):
+        # daily bars 2024-12-26 .. 2025-02-12 (Wed), day k = (10+k, 20+k, 5+k, 11+k); the week of 02-10
+        # is in progress. w holds TradingView's own 1W bars: 12-09 (no daily bar at all), 12-23 (= the
+        # daily aggregate), 12-30 and 01-27 with other values than the daily bars (as HUNT's open week of
+        # 2026-10-26), no 1W bar for the week of 01-20 although it has daily bars.
+        day = bars_ref.iso_to_day
+        n = day('2025-02-12') - day('2024-12-26') + 1
+        daily = _daily('2024-12-26', [(10 + k, 20 + k, 5 + k, 11 + k) for k in range(n)])
+        daily['w'] = {'d': [day(x) for x in ('2024-12-09', '2024-12-23', '2024-12-30', '2025-01-06',
+                                            '2025-01-13', '2025-01-27', '2025-02-03')],
+                      'o': [1, 10, 14, 21, 28, 42, 49], 'h': [2, 23, 33, 37, 44, 58, 65],
+                      'l': [0.5, 5, 8.5, 16, 23, 37, 44], 'c': [1.5, 14, 21, 28, 35, 49.5, 56]}
+        lcd = day('2025-02-12')
+
+        def fmt(b):
+            return ' '.join([bars_ref.iso(b.start), bars_ref.iso(b.end), bars_ref.iso(b.first),
+                             bars_ref.iso(b.last)] + ['%g' % v for v in (b.o, b.h, b.l, b.c)])
+
+        def rows(tf, data=daily, last=lcd):
+            return [fmt(b) for b in bars_ref.confirmed_prefix(bars_ref.build_bars(data, tf), last)]
+
+        # 1W = the 1W bars; first/last = their Monday
+        self.assertEqual(rows('1W'), ['2024-12-09 2024-12-15 2024-12-09 2024-12-09 1 2 0.5 1.5',
+                                      '2024-12-23 2024-12-29 2024-12-23 2024-12-23 10 23 5 14',
+                                      '2024-12-30 2025-01-05 2024-12-30 2024-12-30 14 33 8.5 21',
+                                      '2025-01-06 2025-01-12 2025-01-06 2025-01-06 21 37 16 28',
+                                      '2025-01-13 2025-01-19 2025-01-13 2025-01-13 28 44 23 35',
+                                      '2025-01-27 2025-02-02 2025-01-27 2025-01-27 42 58 37 49.5',
+                                      '2025-02-03 2025-02-09 2025-02-03 2025-02-03 49 65 44 56'])
+        # 2W / 3W: aggregates of the 1W bars per bucket; the 2024 cycle (it began on Monday 2024-01-01)
+        # ends on 2025-01-05 with a one-week 2W bucket and a two-week 3W bucket
+        self.assertEqual(rows('2W'), ['2024-12-02 2024-12-15 2024-12-09 2024-12-09 1 2 0.5 1.5',
+                                      '2024-12-16 2024-12-29 2024-12-23 2024-12-23 10 23 5 14',
+                                      '2024-12-30 2025-01-05 2024-12-30 2024-12-30 14 33 8.5 21',
+                                      '2025-01-06 2025-01-19 2025-01-06 2025-01-13 21 44 16 35',
+                                      '2025-01-20 2025-02-02 2025-01-27 2025-01-27 42 58 37 49.5'])
+        self.assertEqual(rows('3W'), ['2024-12-02 2024-12-22 2024-12-09 2024-12-09 1 2 0.5 1.5',
+                                      '2024-12-23 2025-01-05 2024-12-23 2024-12-30 10 33 5 21',
+                                      '2025-01-06 2025-01-26 2025-01-06 2025-01-13 21 44 16 35'])
+        # a closed week without a 1W bar is no week bar, even with daily bars
+        self.assertEqual(len(rows('1W', last=day('2025-02-16'))), 7)
+        # day and month timeframes ignore w; without w the weeks come from the daily bars
+        plain = dict(daily)
+        del plain['w']
+        for tf in ('1D', '10D', '1M', '2M'):
+            self.assertEqual(rows(tf), rows(tf, data=plain), tf)
+        self.assertEqual(rows('1W', data=plain)[:2],
+                         ['2024-12-23 2024-12-29 2024-12-26 2024-12-29 10 23 5 14',
+                          '2024-12-30 2025-01-05 2024-12-30 2025-01-05 14 30 9 21'])
+        self.assertEqual(rows('1W', data=plain)[4], '2025-01-20 2025-01-26 2025-01-20 2025-01-26 35 51 30 42')
+        # with both m and w, each serves its own timeframes
+        both = dict(daily, m={'d': [day('2025-01-01')], 'o': [7], 'h': [8], 'l': [6], 'c': [7.5]})
+        self.assertEqual(rows('1W', data=both), rows('1W'))
+        self.assertEqual(rows('1M', data=both), ['2025-01-01 2025-01-31 2025-01-01 2025-01-01 7 8 6 7.5'])
+        # malformed 1W bars are refused
+        w = daily['w']
+        for bad in ({**w, 'd': [day('2024-12-10')] + w['d'][1:]},
+                    {**w, 'd': [w['d'][1], w['d'][0]] + w['d'][2:]},
+                    {**w, 'c': w['c'][1:]},
+                    {**w, 'h': [None] + w['h'][1:]}):
+            with self.assertRaises(ValueError):
+                bars_ref.build_bars({**daily, 'w': bad}, '2W')
+
     def test_sha1(self):
         self.assertEqual(bars_ref.bars_sha1([]), 'da39a3ee5e6b4b0d3255bfef95601890afd80709')
         b = bars_ref.Bar(1, 2, 1, 2, 1.0, 1.0, 1.0, 1.0)
@@ -568,6 +631,25 @@ class OptionsAndCli(unittest.TestCase):
             # 1W: 2019-12-30.. (data from Wed 01-01), ..., 2020-02-03..02-09 unconfirmed -> 5 bars
             week = read('TEST_A__1W.tsv').decode('ascii').split('\n')
             self.assertTrue(week[0].startswith('B\t5\t'), week[0])
+            # the CLI passes TradingView's 1W bars (w) through: TEST:W's daily bars cover four weeks, its
+            # w only the first and the third; the bars and their first/last days come from w
+            monday = bars_ref.iso_to_day('2019-12-30')
+            daily_w = _daily('2019-12-30', [(1, 2, 0.5, 1.5)] * 28)
+            daily_w['w'] = {'d': [monday, monday + 14], 'o': [1, 1], 'h': [2, 3], 'l': [0.5, 0.25], 'c': [1.5, 1.5]}
+            write('TEST:W', daily_w)
+            subprocess.check_call([sys.executable, os.path.join(_HERE, 'td_ref.py'), '--out', out,
+                                   '--data', data, '--tickers', 'TEST:W', '--tfs', '1W,2W', '--jobs', '1'],
+                                  stdout=subprocess.DEVNULL)
+            w_bars = [bars_ref.Bar(monday, monday + 6, monday, monday, 1, 2, 0.5, 1.5),
+                      bars_ref.Bar(monday + 14, monday + 20, monday + 14, monday + 14, 1, 3, 0.25, 1.5)]
+            self.assertEqual(read('TEST_W__1W.tsv').decode('ascii').split('\n')[0],
+                             'B\t2\t' + bars_ref.bars_sha1(w_bars))
+            # 2W: the 2019 cycle (from Monday 2019-01-07) has 2W buckets 2019-12-23..2020-01-05; the 2020
+            # cycle starts on Monday 2020-01-06: buckets 01-06..01-19 (w 01-13) and 01-20..02-02 (none)
+            self.assertEqual(read('TEST_W__2W.tsv').decode('ascii').split('\n')[0],
+                             'B\t2\t' + bars_ref.bars_sha1(
+                                 [bars_ref.Bar(monday - 7, monday + 6, monday, monday, 0, 0, 0, 0),
+                                  bars_ref.Bar(monday + 7, monday + 20, monday + 14, monday + 14, 0, 0, 0, 0)]))
         finally:
             shutil.rmtree(tmp)
 

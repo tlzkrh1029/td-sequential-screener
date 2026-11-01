@@ -6,6 +6,9 @@ name: Fetch daily OHLC and deploy
 # The whole history is fetched on every run so revisions of old bars reach the screener the same day they reach
 # the TradingView chart; TD counts depend on every earlier bar.
 # TradingView is read without a login (no TV_SESSIONID secrets).
+# Before the build, verify/diff.mjs runs the two independent ports of the indicator (JavaScript and Python) on the
+# day's data and writes verify/out/summary.json, which the page's 검증 screen shows; a mismatch fails the run at the
+# end, and the site is deployed all the same (as with check-fresh).
 # GitHub disables a public repo's schedule after 60 days without activity. The daily data commit is the only
 # activity this repo relies on: never add dummy/keepalive commits or automated "enable workflow" API calls
 # (GitHub took down keepalive-workflow for circumventing that policy). If the schedule is ever disabled,
@@ -65,6 +68,13 @@ jobs:
             done
           fi
 
+      # both ports on today's data (python3 of the runner, standard library only); the page shows the result
+      - name: Compare the two TD ports on today's data
+        id: verify
+        if: ${{ !cancelled() }}
+        continue-on-error: true
+        run: node verify/diff.mjs --work "$RUNNER_TEMP/td-diff"
+
       - name: Build site
         id: site
         if: ${{ !cancelled() }}
@@ -81,6 +91,12 @@ jobs:
       - name: Check that the data is fresh
         if: ${{ !cancelled() }}
         run: node scripts/check-fresh.mjs
+
+      - name: Fail when the two TD ports disagree
+        if: ${{ !cancelled() && steps.verify.outcome != 'success' }}
+        run: |
+          echo "::error::verify/diff.mjs did not finish with zero mismatches (outcome: ${{ steps.verify.outcome }}); see its log and the page's 검증 screen"
+          exit 1
 
   deploy:
     needs: fetch

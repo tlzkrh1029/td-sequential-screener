@@ -6,6 +6,8 @@
 // runTD(bars, options) runs the script's main block (lines 302-403) once per bar of `bars`, which must be the
 // CONFIRMED bars only, oldest first: the script changes state only on a confirmed bar (lines 308-309), so the bar
 // still in progress on the chart never counts. "Line N" comments point at the Pine source.
+// nextBarTriggers(bars, res, options) and evalTrigger(trigger, bar) (end of file) give the conditions on the bar in
+// progress under which a 9 or a 13 appears on it once it closes, derived from the same rules.
 //
 // Pine semantics kept here: na is NaN, so every comparison with an na operand is false (as in Pine) and na() is
 // Number.isNaN; x[k] reads k bars back on the same bar sequence and is na before the first bar; CountRun and Adopted
@@ -141,8 +143,11 @@ function compare(value, boundary, direction, strict, tolerance) {
 //             origins C: origin bars of the completed runs, in the order their tooltips are appended (null otherwise)
 //             size    'large' | 'small' | 'tiny'
 //   chartVisibleFrom  index of the first label still on the chart after the labelLimit FIFO (lines 136-138)
-//   state   the script's var state after the last bar (na -> null)
-export function runTD(bars, options = {}) {
+//   state   the script's var state after the last bar (na -> null); state.labelCount = labels created so far
+// hooks (optional, for verification): onBar(t, state) is called after every bar t with the state after that bar, in
+// the same form as the returned state (a fresh object each time). The labels bar t created are
+// labels[previous state.labelCount .. state.labelCount). The hook changes nothing the run returns.
+export function runTD(bars, options = {}, hooks = {}) {
   const P = resolveOptions(options);
   const O = bars.o, H = bars.h, L = bars.l, C = bars.c;
   const N = C.length;
@@ -339,7 +344,7 @@ export function runTD(bars, options = {}) {
   for (let slot = 0; slot <= 7; slot++) anchors.push(newAdopted());
 
   // lines 308-403: once per confirmed bar
-  for (bar = 0; bar < N; bar++) {
+  function step() {
     complete.fill(0); // lines 91-93
     refreshed.fill(false);
     for (const t of tipOrigins) t.length = 0;
@@ -347,7 +352,7 @@ export function runTD(bars, options = {}) {
     const prevClose = closeAt(1);
     trueHi = Math.max(high, Number.isNaN(prevClose) ? high : prevClose); // line 96
     trueLo = Math.min(low, Number.isNaN(prevClose) ? low : prevClose); // line 97
-    if (bar < 5) continue; // line 310
+    if (bar < 5) return; // line 310
 
     // lines 311-314: raw setup counts
     const buyContinues = close < closeAt(4) && (buyRaw > 0 || closeAt(1) > closeAt(5));
@@ -462,21 +467,308 @@ export function runTD(bars, options = {}) {
   }
 
   const nn = (x) => (Number.isNaN(x) ? null : x);
+  // the var state as a plain object (na -> null)
+  const snapshot = () => ({
+    buyRaw, sellRaw,
+    buyStart: nn(buyStart), sellStart: nn(sellStart),
+    buyHi: nn(buyHi), buyLo: nn(buyLo), sellHi: nn(sellHi), sellLo: nn(sellLo),
+    runs: runs.map((r) => ({
+      family: r.family, direction: r.direction, originBar: r.originBar, setupStart: r.setupStart, chainStart: r.chainStart,
+      tdst: nn(r.tdst), n: r.n, lastCounted: nn(r.lastCounted), close5: nn(r.close5), close8: nn(r.close8),
+      refresh: r.refresh, lastProcessed: r.lastProcessed,
+    })),
+    anchors: anchors.map((a) => ({ chainStart: nn(a.chainStart), hi: nn(a.hi), lo: nn(a.lo), tdst: nn(a.tdst), originBar: nn(a.originBar) })),
+    counters: counters.slice(),
+    labelCount: labels.length,
+  });
+
+  const onBar = hooks?.onBar;
+  for (bar = 0; bar < N; bar++) {
+    step();
+    if (onBar) onBar(bar, snapshot());
+  }
+
   return {
     labels,
     chartVisibleFrom: Math.max(0, labels.length - P.labelLimit),
-    state: {
-      buyRaw, sellRaw,
-      buyStart: nn(buyStart), sellStart: nn(sellStart),
-      buyHi: nn(buyHi), buyLo: nn(buyLo), sellHi: nn(sellHi), sellLo: nn(sellLo),
-      runs: runs.map((r) => ({
-        family: r.family, direction: r.direction, originBar: r.originBar, setupStart: r.setupStart, chainStart: r.chainStart,
-        tdst: nn(r.tdst), n: r.n, lastCounted: nn(r.lastCounted), close5: nn(r.close5), close8: nn(r.close8),
-        refresh: r.refresh, lastProcessed: r.lastProcessed,
-      })),
-      anchors: anchors.map((a) => ({ chainStart: nn(a.chainStart), hi: nn(a.hi), lo: nn(a.lo), tdst: nn(a.tdst), originBar: nn(a.originBar) })),
-      counters: counters.slice(),
-      labelCount: labels.length,
-    },
+    state: snapshot(),
   };
+}
+
+// ---------- next-bar triggers (조건가) ----------
+//
+// nextBarTriggers(bars, res, options) -> the conditions on the NEXT bar (bar_index bars.n, the bar in progress) under
+// which the script creates a 9 or a 13 label on it, derived from the Pine rules, the confirmed bars and the state after
+// the last of them (res = runTD(bars, options); only res.state is read; `bars` may be a longer series of which the
+// first bars.n count). options must be the ones runTD ran with. Returns
+//   [{ k, d, f, o, all, any, unless }]
+//     k       'S9'  a new Setup 9 (raw 8 -> 9, lines 311-314; shown as 9 or 9*)
+//             'S9r' a repeated display 9 (raw 17 -> 18, 26 -> 27, ...; only with wrapSetup, otherwise raw 18 shows 18)
+//             'C13' one active run completing 13; the C13 of one family and direction that hold together make one
+//                   label "13xN" (N = how many hold), "13r..." when a Combo run has the refresh flag (lines 379-380,
+//                   which the bar itself sets when its raw count reaches 18)
+//     d       -1 buy, 1 sell
+//     f       family 0-3 (C13 only, else null)
+//     o       start day (unix day) of the run's origin bar (C13 only, else null; null if bars has no start)
+//     all     [[src, op, value], ...]           every condition must hold
+//     any     [[[src, op, value], ...], ...] | null
+//                                               if present, at least one group must hold entirely ("Open or Close":
+//                                               the close or the open)
+//     unless  [[[src, op, value], ...], ...] | null
+//                                               the label does not appear if any group holds entirely: the run is
+//                                               removed on that bar before it counts (an opposite Setup 9, a TDST
+//                                               break, a same-direction new Setup 9 under the policies that replace
+//                                               runs or at capacity, a raw 22 restart)
+//   src  'o' | 'h' | 'l' | 'c'   the next bar's open, high, low, close
+//        'hl'                    its high minus its low; only with rejectSmaller or the Recycle range policy, where a new
+//                                Setup 9's range decides whether it replaces a run
+//   op   '<' | '<=' | '>' | '>='; value a finite number.
+// The values are the exact operands of the script's comparisons in floating point (boundary + tolerance as f_compare
+// computes it, and for the setup range the exact float bounds), so evalTrigger(trigger, bar) is true exactly when the
+// script, run on the confirmed bars plus that bar as a confirmed bar, would create the label (verify/triggers-check.mjs
+// checks this on every bar of history). Only runs at count 12 can complete on the next bar (f_advance adds at most one;
+// a run born on the next bar reaches 9 at most). Display options act as on the chart: no S9 without showSetups.
+export function nextBarTriggers(bars, res, options = {}) {
+  const P = resolveOptions(options);
+  const s = res.state;
+  const N = bars.n ?? bars.c.length; // the next bar's bar_index
+  if (N < 5) return []; // line 310: nothing happens before bar_index 5
+  const H = bars.h, L = bars.l, C = bars.c;
+  const num = (x) => (x == null ? NaN : x); // the state stores na as null
+  const enabled = [P.enableSeq, P.enableAggSeq, P.enableCombo, P.enableAggCombo];
+  const seqTol = P.seqTicks * P.mintick, comboTol = P.comboTicks * P.mintick; // as in runTD
+  const close1 = C[N - 1], close4 = C[N - 4];
+  const rawOf = (d) => (d === -1 ? s.buyRaw : s.sellRaw);
+  // lines 311-314 with raw > 0: the setup goes on iff close < close[4] (buy) / close > close[4] (sell)
+  const goesOn = (d) => ['c', d === -1 ? '<' : '>', close4];
+  const out = [];
+
+  // lines 365-375: setup labels
+  if (P.showSetups) {
+    for (const d of [-1, 1]) {
+      const raw = rawOf(d);
+      if (raw === 8) out.push(trigger('S9', d, null, null, [goesOn(d)], null, null));
+      else if (P.wrapSetup && raw >= 17 && raw % 9 === 8) out.push(trigger('S9r', d, null, null, [goesOn(d)], null, null));
+    }
+  }
+
+  // lines 376-392: a run at 12 that f_advance accepts completes; per slot in the order the script advances the runs
+  // (newest first), which is also the order of the label's origins
+  const bySlot = [[], [], [], [], [], [], [], []];
+  for (let i = s.runs.length - 1; i >= 0; i--) {
+    const r = s.runs[i];
+    if (r.n !== 12) continue;
+    const f = r.family, d = r.direction, buy = d === -1;
+    const w = buy ? 'l' : 'h'; // the wick: low (buy) / high (sell)
+    const le = buy ? '<=' : '>=', lt = buy ? '<' : '>';
+    const lim = (x, tol) => (buy ? x + tol : x - tol); // f_compare's boundary + / - tolerance
+    const boundary = buy ? L[N - 2] : H[N - 2]; // low[2] / high[2]
+    const prevWick = buy ? L[N - 1] : H[N - 1]; // low[1] / high[1]
+    let all = [], any = null;
+    if (f < 2) { // lines 175-192
+      const v = lim(boundary, seqTol);
+      if (f === 0) {
+        any = [[['c', le, v]]];
+        if (P.seqFinal === 'Open or Close') any.push([['o', le, v]]);
+        else if (P.seqFinal === 'Wick') any.push([[w, le, v]]);
+      } else {
+        all.push([w, le, v]);
+      }
+      // 13 vs 8: a pass with the wick beyond close8 is a +13 deferral, not a 13
+      if (f === 0 ? P.seqQ138 : P.aggQ138) all.push([w, le, num(r.close8)]);
+    } else if (f === 2) { // lines 193-199 with f_comboAccept, lines 157-165
+      const lc = num(r.lastCounted);
+      const accept = (src) => {
+        const g = Number.isNaN(lc) ? [] : [[src, le, lim(lc, comboTol)]];
+        if (!P.comboRelaxed) g.push([src, le, boundary], [w, le, prevWick], [src, lt, close1]);
+        return g;
+      };
+      any = [accept('c')];
+      if (P.comboFinal === 'Open or Close') any.push(accept('o'));
+      else if (P.comboFinal === 'Wick') any.push(accept(w));
+    } else { // lines 200-205
+      const lc = num(r.lastCounted);
+      if (!Number.isNaN(lc)) all.push([w, le, lc]);
+      if (!P.aggComboRelaxed) all.push([w, le, boundary], [w, lt, prevWick]);
+    }
+
+    const unless = [];
+    // lines 339-344: an opposite actual Setup 9 removes every run of this direction first
+    if (P.cancelOpposite && rawOf(-d) === 8) unless.push([goesOn(-d)]);
+    // lines 345-353: TDST break; trueLo = min(low, close[1]) > tdst (buy), trueHi = max(high, close[1]) < tdst (sell)
+    if (P.cancelTDST) {
+      const tdst = num(r.tdst);
+      if (buy ? close1 > tdst : close1 < tdst) unless.push([[w, buy ? '>' : '<', tdst]]);
+    }
+    // lines 354-364: a new origin of this family and direction on that bar (f_start, lines 231-265)
+    if (enabled[f]) {
+      // raw 22 restart: accepted always and replaces every run of the family and direction
+      if (P.restart22 && f < 2 && rawOf(d) === 21) unless.push([goesOn(d)]);
+      // a new Setup 9: replaces them all (Newest, Recycle range) or, Independent, removes the oldest at capacity;
+      // Keep active never accepts it while a run is active
+      if (rawOf(d) === 8 && P.originPolicy !== 'Keep active') {
+        let extra = null;
+        if (P.originPolicy !== 'Independent') extra = [];
+        else {
+          const same = s.runs.filter((x) => x.family === f && x.direction === d); // oldest first, never more than maxOrigins
+          // only the oldest goes, and only if every run of the family and direction is still there at f_start
+          // (a TDST break that bar leaves fewer than maxOrigins)
+          if (same.length >= P.maxOrigins && same[0] === r) {
+            extra = [];
+            if (P.cancelTDST) {
+              for (const x of same.slice(1)) {
+                const tdst = num(x.tdst);
+                if (buy ? close1 > tdst : close1 < tdst) extra.push([w, buy ? '<=' : '>=', tdst]);
+              }
+            }
+          }
+        }
+        if (extra) {
+          for (const g of setupAccepted(s, f, d, close1, P)) unless.push([goesOn(d), ...g, ...extra]);
+        }
+      }
+    }
+    bySlot[slotOf(f, d)].push(trigger('C13', d, f, bars.start ? bars.start[r.originBar] : null, all, any, unless));
+  }
+  for (const list of bySlot) out.push(...list);
+  return out.filter(Boolean);
+}
+
+// evalTrigger(trigger, bar): whether a bar {o, h, l, c} (or [o, h, l, c]) satisfies a trigger of nextBarTriggers.
+export function evalTrigger(trigger, bar) {
+  const b = Array.isArray(bar) ? { o: bar[0], h: bar[1], l: bar[2], c: bar[3] } : bar;
+  const holds = (group) => group.every(([src, op, v]) => {
+    const x = src === 'hl' ? b.h - b.l : b[src];
+    return op === '<' ? x < v : op === '<=' ? x <= v : op === '>' ? x > v : op === '>=' ? x >= v : false;
+  });
+  return holds(trigger.all) && (trigger.any == null || trigger.any.some(holds)) && !(trigger.unless != null && trigger.unless.some(holds));
+}
+
+// When f_start accepts a new Setup 9 of family f, direction d on the next bar while a run of them is active, as groups
+// of conditions (one must hold; [[]] = always, [] = never). Only the setup's range span = chainHi - chainLo (line 234)
+// depends on that bar: chainHi = max(buyHi, trueHi) = max(A, high), chainLo = min(B, low) with A = max(buyHi, close[1]),
+// B = min(buyLo, close[1]) (lines 96-97, 319-321; sell alike). The adopted reference it is compared with is not
+// extended on that bar (its chainStart is an older chain's). rejectSmaller refuses span < oldSpan (line 242); Recycle
+// range needs ratio = span / oldSpan * 100 in [recycleMin, recycleMax] (lines 236, 243); Independent and Newest
+// accept anything else.
+function setupAccepted(s, f, d, close1, P) {
+  const num = (x) => (x == null ? NaN : x);
+  const a = s.anchors[slotOf(f, d)];
+  const oldSpan = num(a.hi) - num(a.lo);
+  let lo = -Infinity, hi = Infinity; // span in [lo, hi]
+  if (P.rejectSmaller && !Number.isNaN(oldSpan)) lo = oldSpan;
+  if (P.originPolicy === 'Recycle range') {
+    if (!(oldSpan > 0)) return []; // ratio is na: not accepted while a run is active
+    lo = Math.max(lo, firstTrue((x) => x / oldSpan * 100.0 >= P.recycleMin));
+    hi = lastTrue((x) => x / oldSpan * 100.0 <= P.recycleMax);
+  }
+  if (lo > hi) return [];
+  if (lo === -Infinity && hi === Infinity) return [[]];
+  const A = Math.max(num(d === -1 ? s.buyHi : s.sellHi), close1), B = Math.min(num(d === -1 ? s.buyLo : s.sellLo), close1);
+  const groups = [];
+  // high <= A, low >= B: span = A - B
+  if (A - B >= lo && A - B <= hi) groups.push([['h', '<=', A], ['l', '>=', B]]);
+  // high > A, low >= B: span = high - B, rising with the high
+  groups.push([['h', '>', A], ['l', '>=', B], ['h', '>=', firstTrue((x) => x - B >= lo)], ['h', '<=', lastTrue((x) => x - B <= hi)]]);
+  // high <= A, low < B: span = A - low, falling with the low
+  groups.push([['h', '<=', A], ['l', '<', B], ['l', '<=', lastTrue((x) => A - x >= lo)], ['l', '>=', firstTrue((x) => A - x <= hi)]]);
+  // high > A, low < B: span = high - low
+  groups.push([['h', '>', A], ['l', '<', B], ['hl', '>=', lo], ['hl', '<=', hi]]);
+  return groups;
+}
+
+// Exact float thresholds of monotone predicates, by bisection over the doubles in order (as 64-bit integers).
+const F64 = new Float64Array(1), U64 = new BigUint64Array(F64.buffer), SIGN = 1n << 63n;
+const ordOf = (x) => { F64[0] = x; const u = U64[0]; return u >= SIGN ? SIGN - u : u; }; // -0 and +0 -> 0
+const ofOrd = (k) => { U64[0] = k >= 0n ? k : SIGN - k; return F64[0]; };
+// the smallest double x with p(x), for p false ... false true ... true (-Infinity / Infinity at the ends)
+function firstTrue(p) {
+  if (p(-Infinity)) return -Infinity;
+  if (!p(Infinity)) return Infinity;
+  let lo = ordOf(-Infinity), hi = ordOf(Infinity);
+  while (hi - lo > 1n) { const mid = (lo + hi) >> 1n; if (p(ofOrd(mid))) hi = mid; else lo = mid; }
+  return ofOrd(hi);
+}
+// the largest double x with p(x), for p true ... true false ... false
+function lastTrue(p) {
+  if (!p(-Infinity)) return -Infinity;
+  if (p(Infinity)) return Infinity;
+  let lo = ordOf(-Infinity), hi = ordOf(Infinity);
+  while (hi - lo > 1n) { const mid = (lo + hi) >> 1n; if (p(ofOrd(mid))) lo = mid; else hi = mid; }
+  return ofOrd(lo);
+}
+
+// A trigger with its conditions simplified (null when it can never hold): per source and side only the tightest
+// bound; a group that contradicts `all` is dropped; conditions that `all` implies are left out of the groups; of two
+// groups where one implies the other, the implied (weaker) one is kept.
+function trigger(k, d, f, o, all, any, unless) {
+  let a = tighten(all);
+  if (!a) return null;
+  if (any) {
+    let groups = [];
+    for (const g of any) {
+      const t = reduce(a, g);
+      if (t === null) continue;
+      if (!t.length) { groups = null; break; } // a group that always holds
+      groups.push(t);
+    }
+    if (groups) {
+      groups = prune(groups);
+      if (!groups.length) return null;
+      if (groups.length === 1) { a = tighten([...a, ...groups[0]]); groups = null; }
+    }
+    any = groups;
+  }
+  let un = [];
+  for (const g of unless || []) {
+    const t = reduce(a, g);
+    if (t === null) continue;
+    if (!t.length) return null; // removed whenever `all` holds
+    un.push(t);
+  }
+  un = prune(un);
+  return { k, d, f, o, all: a, any, unless: un.length ? un : null };
+}
+
+// OR-ed groups without those that imply another one (of equivalent groups the first stays)
+function prune(groups) {
+  const entails = (g, h) => h.every((c) => g.some((x) => implies(x, c))); // g implies h
+  return groups.filter((g, i) => !groups.some((h, j) => j !== i && entails(g, h) && (!entails(h, g) || j < i)));
+}
+
+// group g given that `all` (tightened) holds: null if they cannot hold together, else g without what `all` implies
+function reduce(all, g) {
+  const t = tighten(g);
+  if (!t || !tighten([...all, ...t])) return null;
+  return t.filter((c) => !all.some((x) => implies(x, c)));
+}
+
+// does condition x imply condition c (same source, same side, at least as tight)?
+function implies(x, c) {
+  if (x[0] !== c[0]) return false;
+  const up = (op) => op === '<' || op === '<=';
+  if (up(x[1]) !== up(c[1])) return false;
+  if (x[2] === c[2]) return x[1] === c[1] || x[1] === '<' || x[1] === '>';
+  return up(x[1]) ? x[2] < c[2] : x[2] > c[2];
+}
+
+// the tightest bound per source and side; null if they contradict or a value is na (a comparison with na is false).
+// A bound at +-Infinity is always true or never true for a finite price.
+function tighten(conds) {
+  const keys = [], bound = new Map();
+  for (const c of conds) {
+    const [src, op, v] = c;
+    const up = op === '<' || op === '<=';
+    if (Number.isNaN(v) || (up ? v === -Infinity : v === Infinity)) return null;
+    if (up ? v === Infinity : v === -Infinity) continue;
+    const key = src + (up ? '<' : '>');
+    const cur = bound.get(key);
+    if (!cur) { keys.push(key); bound.set(key, [src, op, v]); } else if (implies([src, op, v], cur) && !implies(cur, [src, op, v])) bound.set(key, [src, op, v]);
+  }
+  for (const key of keys) {
+    if (key.endsWith('<')) continue;
+    const lo = bound.get(key), hi = bound.get(key.slice(0, -1) + '<');
+    if (hi && (lo[2] > hi[2] || (lo[2] === hi[2] && (lo[1] === '>' || hi[1] === '<')))) return null;
+  }
+  return keys.map((key) => bound.get(key));
 }

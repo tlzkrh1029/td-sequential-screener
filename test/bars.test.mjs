@@ -193,3 +193,75 @@ test('buildBars: month timeframes come from TradingView\'s 1M bars when the file
     assert.throws(() => buildBars({ ...data, m: bad }, '1M', last), /1M bar|same length/);
   }
 });
+
+// TradingView's own 1W bars (w): week timeframes are aggregated from them, like month timeframes from m
+test('buildBars: week timeframes come from TradingView\'s 1W bars when the file has them', () => {
+  const rows = {};
+  let k = 0;
+  for (let d = D('2024-12-26'); d <= D('2025-02-12'); d++, k++) rows[isoOfDay(d)] = [10 + k, 20 + k, 5 + k, 11 + k];
+  const data = daily('2024-12-26', '2025-02-12', rows); // day k from 2024-12-26: [10 + k, 20 + k, 5 + k, 11 + k]
+  const last = D('2025-02-12'); // Wednesday: the week of 2025-02-10 is in progress (k 46 .. 48)
+  data.w = {
+    // the week of 2024-12-09 has no daily bar at all; 12-30 and 01-27 differ from the daily bars (like CRYPTO:HUNTUSD's
+    // open week of 2026-10-26); the week of 01-20 has daily bars but no 1W bar
+    d: ['2024-12-09', '2024-12-23', '2024-12-30', '2025-01-06', '2025-01-13', '2025-01-27', '2025-02-03'].map(D),
+    o: [1, 10, 14, 21, 28, 42, 49], h: [2, 23, 33, 37, 44, 58, 65], l: [0.5, 5, 8.5, 16, 23, 37, 44], c: [1.5, 14, 21, 28, 35, 49.5, 56],
+  };
+  const isoB = (b) => isoBars(b).map((x) => x.join(' '));
+  const part = (b) => [isoOfDay(b.partial.start), isoOfDay(b.partial.end), isoOfDay(b.partial.first), isoOfDay(b.partial.last), b.partial.o, b.partial.h, b.partial.l, b.partial.c].join(' ');
+  // 1W: the 1W bars themselves; first/last = their Mondays; the week in progress still from the daily bars
+  let b = buildBars(data, '1W', last);
+  assert.deepEqual(isoB(b), [
+    '2024-12-09 2024-12-15 2024-12-09 2024-12-09 1 2 0.5 1.5',
+    '2024-12-23 2024-12-29 2024-12-23 2024-12-23 10 23 5 14',
+    '2024-12-30 2025-01-05 2024-12-30 2024-12-30 14 33 8.5 21',
+    '2025-01-06 2025-01-12 2025-01-06 2025-01-06 21 37 16 28',
+    '2025-01-13 2025-01-19 2025-01-13 2025-01-13 28 44 23 35',
+    '2025-01-27 2025-02-02 2025-01-27 2025-01-27 42 58 37 49.5',
+    '2025-02-03 2025-02-09 2025-02-03 2025-02-03 49 65 44 56',
+  ]);
+  assert.equal(part(b), '2025-02-10 2025-02-16 2025-02-10 2025-02-12 56 68 51 59');
+  // 2W and 3W: aggregates of the 1W bars of each bucket (cycles restart at the first Monday of the year; the 2024 cycle
+  // ends with a one-week 2W and a two-week 3W bucket); the bucket in progress is not a confirmed bar
+  b = buildBars(data, '2W', last);
+  assert.deepEqual(isoB(b), [
+    '2024-12-02 2024-12-15 2024-12-09 2024-12-09 1 2 0.5 1.5',
+    '2024-12-16 2024-12-29 2024-12-23 2024-12-23 10 23 5 14',
+    '2024-12-30 2025-01-05 2024-12-30 2024-12-30 14 33 8.5 21',
+    '2025-01-06 2025-01-19 2025-01-06 2025-01-13 21 44 16 35',
+    '2025-01-20 2025-02-02 2025-01-27 2025-01-27 42 58 37 49.5', // only the 1W bar of 01-27
+  ]);
+  assert.equal(part(b), '2025-02-03 2025-02-16 2025-02-03 2025-02-12 49 68 44 59');
+  b = buildBars(data, '3W', last);
+  assert.deepEqual(isoB(b), [
+    '2024-12-02 2024-12-22 2024-12-09 2024-12-09 1 2 0.5 1.5',
+    '2024-12-23 2025-01-05 2024-12-23 2024-12-30 10 33 5 21',
+    '2025-01-06 2025-01-26 2025-01-06 2025-01-13 21 44 16 35',
+  ]);
+  assert.equal(part(b), '2025-01-27 2025-02-16 2025-01-27 2025-02-12 42 68 37 59');
+  // once the week of 02-10 has closed, the 1W bars still decide: no 1W bar for it means no bar
+  b = buildBars(data, '1W', D('2025-02-16'));
+  assert.equal(b.n, 7);
+  assert.equal(b.partial, null);
+  // day and month timeframes ignore w
+  for (const tf of ['1D', '10D', '1M', '2M']) assert.deepEqual(isoBars(buildBars(data, tf, last)), isoBars(buildBars({ ...data, w: undefined }, tf, last)), tf);
+  // with both m and w, each serves its own timeframes
+  const both = { ...data, m: { d: [D('2025-01-01')], o: [7], h: [8], l: [6], c: [7.5] } };
+  assert.deepEqual(isoB(buildBars(both, '1W', last)), isoB(buildBars(data, '1W', last)));
+  assert.deepEqual(isoB(buildBars(both, '1M', last)), ['2025-01-01 2025-01-31 2025-01-01 2025-01-01 7 8 6 7.5']);
+  // without w the week timeframes are rebuilt from the daily bars, as before
+  assert.deepEqual(isoB(buildBars({ ...data, w: undefined }, '1W', last)), [
+    '2024-12-23 2024-12-29 2024-12-26 2024-12-29 10 23 5 14',
+    '2024-12-30 2025-01-05 2024-12-30 2025-01-05 14 30 9 21',
+    '2025-01-06 2025-01-12 2025-01-06 2025-01-12 21 37 16 28',
+    '2025-01-13 2025-01-19 2025-01-13 2025-01-19 28 44 23 35',
+    '2025-01-20 2025-01-26 2025-01-20 2025-01-26 35 51 30 42',
+    '2025-01-27 2025-02-02 2025-01-27 2025-02-02 42 58 37 49',
+    '2025-02-03 2025-02-09 2025-02-03 2025-02-09 49 65 44 56',
+  ]);
+  // malformed 1W bars are refused
+  for (const bad of [{ ...data.w, d: [D('2024-12-10'), ...data.w.d.slice(1)] }, { ...data.w, d: [data.w.d[1], data.w.d[0], ...data.w.d.slice(2)] },
+    { ...data.w, c: data.w.c.slice(1) }, { ...data.w, h: [null, ...data.w.h.slice(1)] }]) {
+    assert.throws(() => buildBars({ ...data, w: bad }, '2W', last), /1W bar|same length/);
+  }
+});

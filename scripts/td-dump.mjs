@@ -5,7 +5,8 @@
 // <out>/<FILE_ID>__<TF>.tsv (FILE_ID = ticker id with every run of characters outside [A-Za-z0-9.] replaced by "_"):
 //   B\t<n>\t<sha1>        n confirmed bars; sha1 (lowercase hex) of "<startDay>,<firstDataDay>,<lastDataDay>\n" over
 //                         them in order (unix day integers; for a month timeframe built from TradingView's 1M bars,
-//                         the data days are the first days of the months of its first and last 1M bar)
+//                         the data days are the first days of the months of its first and last 1M bar, for a week
+//                         timeframe built from its 1W bars the Mondays of its first and last 1W bar)
 //   L\t<barStartISO>\t<kind>\t<dir>\t<family>\t<text>\t<extra>
 //                         one line per label, in the order the script creates them (labels its labelLimit FIFO
 //                         deletes later included). family "-" for S. extra: S raw setup count; I and X origin bar
@@ -20,7 +21,8 @@
 //   --tfs      default: all 20 timeframes
 //   --data     default: this repository's data/daily
 // A ticker without a data file is reported and makes the run exit with code 1 (its files are not written). A data file
-// without TradingView's 1M bars (m) is reported too: its month timeframes are then rebuilt from the daily bars.
+// without TradingView's 1M bars (m) or 1W bars (w) is reported too: its month or week timeframes are then rebuilt from
+// the daily bars. The whole data file goes to buildBars, so m and w reach it as stored.
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import path from 'node:path';
@@ -79,7 +81,7 @@ async function main() {
   mkdirSync(args.out, { recursive: true });
 
   let files = 0, labels = 0, barsTotal = 0, tBars = 0, tEngine = 0;
-  const missing = [], noMonthly = [];
+  const missing = [], noMonthly = [], noWeekly = [];
   for (const id of tickers) {
     const fileId = fileIdOf(id);
     let daily;
@@ -91,6 +93,7 @@ async function main() {
     }
     if (daily.id !== undefined && daily.id !== id) throw new Error(`${fileId}.json holds ${daily.id}, expected ${id}`);
     if (daily.m == null && tfs.some((tf) => tf.endsWith('M'))) noMonthly.push(id);
+    if (daily.w == null && tfs.some((tf) => tf.endsWith('W'))) noWeekly.push(id);
     for (const tf of tfs) {
       const a = performance.now();
       const bars = buildBars(daily, tf, lastClosedDay);
@@ -109,6 +112,9 @@ async function main() {
   console.log(`td-dump: total ${s(performance.now() - t0)} (bars ${s(tBars)}, engine ${s(tEngine)}) -> ${args.out}`);
   if (noMonthly.length) {
     console.error(`td-dump: ${noMonthly.length} tickers without TradingView 1M bars, month timeframes rebuilt from 1D: ${noMonthly.slice(0, 10).join(' ')}${noMonthly.length > 10 ? ' ...' : ''}`);
+  }
+  if (noWeekly.length) {
+    console.error(`td-dump: ${noWeekly.length} tickers without TradingView 1W bars, week timeframes rebuilt from 1D: ${noWeekly.slice(0, 10).join(' ')}${noWeekly.length > 10 ? ' ...' : ''}`);
   }
   if (missing.length) {
     console.error(`td-dump: ${missing.length} tickers without usable data:\n  ${missing.join('\n  ')}`);

@@ -1,12 +1,12 @@
 // Build the TD Sequential screener site from data/daily (written by scripts/fetch-tv.mjs).
 //
 // Every coin in data/universe.json is listed; its USD ticker comes from data/tickers.json. For each coin and each of
-// the 20 timeframes the bars are rebuilt from the daily OHLC, the month timeframes from TradingView's own 1M bars
-// (dashboard/bars.js), and TD Research v6 is counted on the confirmed bars (dashboard/td-engine.js, the same code the
-// page runs), with the indicator's default inputs.
+// the 20 timeframes the bars are rebuilt from the daily OHLC, the week timeframes from TradingView's own 1W bars and
+// the month timeframes from its own 1M bars (dashboard/bars.js), and TD Research v6 is counted on the confirmed bars
+// (dashboard/td-engine.js, the same code the page runs), with the indicator's default inputs.
 // The screener needs only each coin's summary per timeframe, which goes into the page. The coin page needs the daily
-// OHLC and the 1M bars, which go into d/<n>.json files of --chunk coins each (fetched when a coin is opened; the page
-// recounts that coin in the browser with the same engine). The breadth board's counts go into b.json.
+// OHLC and the 1W and 1M bars, which go into d/<n>.json files of --chunk coins each (fetched when a coin is opened; the
+// page recounts that coin in the browser with the same engine). The breadth board's counts go into b.json.
 //
 // Output (default dist/site): index.html, b.json, d/0.json, d/1.json, ...
 // Usage: node scripts/build-site.mjs [outDir] [--daily-dir data/daily] [--chunk 3] [--fragment]
@@ -46,8 +46,17 @@ async function load(id) {
 //   n: confirmed bars; ls/le: start and end day of the last confirmed bar; ps/pl: start day of the bar still in
 //   progress and the last day it holds so far (null when every bar is closed); br/sr: raw buy/sell Setup counts;
 //   ru: per family/direction slot (family * 2 + (sell ? 1 : 0)) the number of active runs and their highest count;
-//   rl: labels on the last RECENT + 1 bars as [barsAgo, kind, dir, family, text]; l9: the newest Setup 9 label
-//   [barsAgo, dir, text, raw]; l13: the newest completion label [barsAgo, dir, family, text]; tg: next-bar triggers.
+//   rl: labels on the last RECENT + 1 bars as [barsAgo, kind, dir, family, text], plus raw for a Setup label
+//   ([barsAgo, 'S', dir, null, text, raw]; a raw of 18, 27, ... is a repeated 9); l9: the newest Setup 9 label
+//   [barsAgo, dir, text, raw]; l13: the newest completion label [barsAgo, dir, family, text, bar start day];
+//   tg: the next-bar triggers (TD.nextBarTriggers): the conditions on the bar in progress under which a 9 or a 13
+//   appears on it once it closes, [{k: 'S9' | 'S9r' | 'C13', d: -1 buy | 1 sell, f: family (C13) | null,
+//   o: origin bar start day (C13) | null, all: [[src, op, value], ...], any: [[cond, ...], ...] | null (one group
+//   must hold), unless: [[cond, ...], ...] | null (no label if a group holds)}], src 'o' | 'h' | 'l' | 'c' of that bar
+//   ('hl' = high - low only with non-default origin options), op '<' | '<=' | '>' | '>='; TD.evalTrigger(t, bar) tests
+//   one; C13 of one family and direction holding together make one "13xN" label;
+//   po: [o, h, l, c] of the bar in progress so far (from the daily bars through the last closed day; null when it
+//   holds no closed day yet, as on 1D), e.g. TD.evalTrigger(t, po) = whether a trigger would hold if it closed now.
 function summarize(bars, res) {
   const n = bars.n, s = res.state;
   const ru = new Array(16).fill(0);
@@ -56,15 +65,17 @@ function summarize(bars, res) {
   let l9 = null, l13 = null;
   for (let i = res.labels.length - 1; i >= 0; i--) {
     const L = res.labels[i], ago = n - 1 - L.bar;
-    if (ago <= RECENT && L.kind !== 'X') rl.push([ago, L.kind, L.dir, L.family ?? null, L.text]);
+    if (ago <= RECENT && L.kind !== 'X') rl.push(L.kind === 'S' ? [ago, L.kind, L.dir, null, L.text, L.raw] : [ago, L.kind, L.dir, L.family ?? null, L.text]);
     if (!l9 && L.kind === 'S' && L.text.startsWith('9')) l9 = [ago, L.dir, L.text, L.raw];
-    if (!l13 && L.kind === 'C') l13 = [ago, L.dir, L.family, L.text];
+    if (!l13 && L.kind === 'C') l13 = [ago, L.dir, L.family, L.text, bars.start[L.bar]];
     if (ago > RECENT && l9 && l13) break;
   }
   rl.reverse();
-  const out = { n, ls: n ? bars.start[n - 1] : null, le: n ? bars.end[n - 1] : null, ps: bars.partial?.start ?? null, pl: bars.partial?.last ?? null,
+  const p = bars.partial;
+  const out = { n, ls: n ? bars.start[n - 1] : null, le: n ? bars.end[n - 1] : null, ps: p?.start ?? null, pl: p?.last ?? null,
     br: s.buyRaw, sr: s.sellRaw, ru, rl, l9, l13 };
   if (typeof TD.nextBarTriggers === 'function') out.tg = TD.nextBarTriggers(bars, res, OPTIONS);
+  out.po = p ? [p.o, p.h, p.l, p.c] : null;
   return out;
 }
 
@@ -118,8 +129,9 @@ for (const u of universe.coins) {
       return summarize(bars, res);
     });
   }
-  // the whole data file but its id: the daily OHLC plus TradingView's own 1M bars (m), from which dashboard/bars.js
-  // builds the month timeframes, so the page recounts the coin from exactly the bars counted here
+  // the whole data file but its id: the daily OHLC plus TradingView's own 1M and 1W bars (m, w), from which
+  // dashboard/bars.js builds the month and week timeframes, so the page recounts the coin from exactly the bars counted
+  // here
   coins.push({ coin, daily: daily && (({ id, ...rest }) => rest)(daily) });
 }
 console.log(`counted ${runs} coin-timeframes (${labels} labels) in ${((Date.now() - t0) / 1000).toFixed(1)}s`);

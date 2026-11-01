@@ -1,0 +1,1880 @@
+<title>TD 시퀀셜 스크리너</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap">
+<style>
+/* Four screens behind a sticky tab bar: screener table, TD breadth board, coin page, verification.
+   Tokens and controls follow the owner's WMA screener; the indicator colors are the chart's label colors. */
+:root {
+  --bg: #f4f6f8; --surface: #ffffff; --sunken: #eef1f4; --fg: #141922; --muted: #5b6574; --faint: #737c8a;
+  --line: #dfe3e8; --accent: #2f5bd3; --accent-soft: #e6ecfb; --warn-bg: #fff6db; --warn-fg: #7a5a00; --hl: #f2b300;
+  --bad-bg: #fde7e7; --bad-fg: #9b1116; --ok-fg: #0f7b3b;
+  --up: #089981; --down: #F23645; --setup: #787B86; --setup-ink: #5f626b;
+  --f0: #DC2A2A; --f1: #EB9223; --f2: #74279A; --f3: #E74BB1;
+  --fi0: #ffffff; --fi1: #141922; --fi2: #ffffff; --fi3: #141922;
+  --font-sans: "IBM Plex Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+  --r: 10px;
+  --c0w: 160px; --c1w: 60px; --tfw: 48px; --n13w: 176px;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0e1116; --surface: #151a21; --sunken: #1b2129; --fg: #e5e8ee; --muted: #9aa3b1; --faint: #6c7584;
+    --line: #262e39; --accent: #7d9cf5; --accent-soft: #1e2840; --warn-bg: #33290d; --warn-fg: #f2cf6b; --hl: #ffc93c;
+    --bad-bg: #3b1416; --bad-fg: #ff8a84; --ok-fg: #3ddc84; --setup-ink: #a3a6b0;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0e1116; --surface: #151a21; --sunken: #1b2129; --fg: #e5e8ee; --muted: #9aa3b1; --faint: #6c7584;
+  --line: #262e39; --accent: #7d9cf5; --accent-soft: #1e2840; --warn-bg: #33290d; --warn-fg: #f2cf6b; --hl: #ffc93c;
+  --bad-bg: #3b1416; --bad-fg: #ff8a84; --ok-fg: #3ddc84; --setup-ink: #a3a6b0;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--fg); font-family: var(--font-sans); font-size: 14px; line-height: 1.5; word-break: keep-all; overflow-wrap: break-word; }
+h1, h2, h3 { margin: 0; text-wrap: balance; }
+h2 { font-size: 16px; font-weight: 600; }
+button { font: inherit; color: inherit; }
+input { font: inherit; color: inherit; }
+a { color: var(--accent); }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+[hidden] { display: none !important; }
+.num { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+/* shell */
+.appbar { position: sticky; top: 0; z-index: 20; background: var(--surface); border-bottom: 1px solid var(--line); }
+.appbar-in { max-width: 2200px; margin: 0 auto; padding-inline: 20px; display: flex; flex-wrap: wrap; align-items: center; gap: 0 18px; min-height: 52px; }
+.brand { font-weight: 700; font-size: 16px; letter-spacing: -.01em; white-space: nowrap; }
+.brand small { font-family: var(--font-mono); font-weight: 500; font-size: 11px; color: var(--muted); margin-left: 8px; }
+.tabs { display: flex; gap: 2px; overflow-x: auto; scrollbar-width: none; max-width: 100%; }
+.tabs::-webkit-scrollbar { display: none; }
+.tabs a { text-decoration: none; color: var(--muted); font-weight: 500; font-size: 14px; padding: 14px 12px 12px; border-bottom: 2px solid transparent; white-space: nowrap; }
+.tabs a[aria-current="page"] { color: var(--fg); border-bottom-color: var(--accent); }
+.tabs a:focus-visible { outline-offset: -2px; }
+.wrap { max-width: 2200px; margin: 0 auto; padding-inline: 20px; padding-block: 16px 40px; display: grid; gap: 14px; min-width: 0; }
+.wrap > section { min-width: 0; }
+.wrap, .vstack, .panel.pad, .pbody { grid-template-columns: minmax(0, 1fr); }
+.vstack { display: grid; gap: 12px; min-width: 0; }
+.banner { font-size: 13px; padding: 9px 12px; border-radius: 8px; background: var(--accent-soft); color: var(--fg); }
+.banner.bad { background: var(--bad-bg); color: var(--bad-fg); font-weight: 600; border: 1px solid currentColor; }
+.banner a { color: inherit; }
+.lead { margin: 0; font-size: 13px; color: var(--muted); }
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); min-width: 0; }
+.panel.pad { padding: 14px 16px; display: grid; gap: 10px; }
+.controls { display: flex; flex-wrap: wrap; gap: 10px 16px; align-items: center; padding: 10px 12px; }
+.ctl { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; min-width: 0; }
+.ctl > span { font-size: 12px; color: var(--muted); font-weight: 500; }
+.seg { display: inline-flex; flex-wrap: wrap; padding: 3px; gap: 2px; border-radius: 9px; background: var(--sunken); border: 1px solid var(--line); }
+.seg button { border: 0; background: transparent; padding: 4px 10px; border-radius: 6px; font-size: 13px; font-weight: 500; color: var(--muted); cursor: pointer; white-space: nowrap; }
+.seg button:hover { color: var(--fg); }
+.seg button[aria-pressed="true"] { background: var(--surface); color: var(--fg); box-shadow: 0 1px 2px rgb(0 0 0 / .14); }
+.seg.tfs button { padding: 3px 7px; font-family: var(--font-mono); font-size: 12px; }
+.seg.fam button i { display: inline-block; width: 9px; height: 9px; border-radius: 2px; margin-right: 5px; vertical-align: 0; }
+.seg.fam button[aria-pressed="false"] i { opacity: .35; }
+.search { border: 1px solid var(--line); background: var(--surface); border-radius: 8px; padding: 6px 10px; width: 180px; max-width: 100%; }
+.hint { font-size: 12.5px; color: var(--muted); margin: 0; }
+.btn { border: 1px solid var(--line); background: var(--surface); border-radius: 8px; padding: 5px 11px; cursor: pointer; font-size: 13px; color: var(--fg); }
+.btn:hover { background: var(--sunken); }
+.btn:disabled { opacity: .45; cursor: default; }
+.btn.sm { padding: 3px 9px; font-size: 12.5px; }
+.empty { padding: 26px; text-align: center; color: var(--muted); }
+.empty p { max-width: 64ch; margin: 0 auto 10px; }
+
+/* indicator marks: 13 = filled chip in the family color, 9 = gray outline, +13 = small colored text */
+.k13, .k9, .kd { font-family: var(--font-mono); font-weight: 600; font-style: normal; white-space: nowrap; display: inline-block; }
+.k13 { font-size: 11px; line-height: 15px; padding: 0 3px; border-radius: 4px; background: var(--c); color: var(--i); }
+.k9 { font-size: 11px; line-height: 13px; padding: 0 3px; border-radius: 4px; border: 1px solid var(--setup); color: var(--setup-ink); }
+.kd { font-size: 9.5px; line-height: 1; color: var(--c); font-weight: 700; }
+.ago { font: 500 9px/1 var(--font-mono); color: var(--muted); font-style: normal; }
+.pg { font: 600 10px/1 var(--font-mono); opacity: .62; }
+.pg.su { color: var(--setup-ink); font-weight: 500; }
+.tgd { display: inline-block; width: 6px; height: 6px; border-radius: 50%; border: 1.5px solid var(--c); flex: none; }
+.tgd.on { background: var(--c); }
+
+/* legend */
+.legend { display: flex; flex-wrap: wrap; gap: 6px 14px; align-items: center; font-size: 12px; color: var(--muted); }
+.legend > span { display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
+.help > summary { cursor: pointer; padding: 8px 12px; font-size: 13px; font-weight: 500; list-style: none; }
+.help > summary::-webkit-details-marker { display: none; }
+.help > summary::before { content: '▸ '; color: var(--muted); font-size: 11px; }
+.help[open] > summary::before { content: '▾ '; }
+.help > div { padding: 0 14px 12px; font-size: 13px; color: var(--fg); }
+.help ul { margin: 4px 0 0; padding-left: 18px; display: grid; gap: 3px; }
+
+/* screener table: own scroll box, sticky header and first columns */
+.tblw { overflow: auto; max-height: calc(100dvh - var(--appbar-h, 53px) - 18px); scroll-margin-top: calc(var(--appbar-h, 53px) + 8px);
+  scroll-padding-top: 34px; scroll-padding-left: calc(var(--c0w) + var(--c1w)); }
+table.scr { border-collapse: separate; border-spacing: 0; table-layout: fixed; width: calc(var(--c0w) + var(--c1w) + 20 * var(--tfw) + var(--n13w)); min-width: 100%; font-size: 12.5px; }
+.scr th { position: sticky; top: 0; z-index: 3; background: var(--surface); font-size: 11.5px; font-weight: 600; color: var(--muted); text-align: center; padding: 8px 2px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+.scr th.tf { font-family: var(--font-mono); font-weight: 500; }
+.scr td { border-bottom: 1px solid var(--line); vertical-align: middle; background: var(--surface); }
+.scr .c0 { position: sticky; left: 0; z-index: 2; width: var(--c0w); min-width: var(--c0w); max-width: var(--c0w); text-align: left; padding: 2px 8px 2px 10px; }
+.scr .c1 { position: sticky; left: var(--c0w); z-index: 2; width: var(--c1w); min-width: var(--c1w); text-align: right; padding: 2px 8px; border-right: 1px solid var(--line); }
+.scr th.c0, .scr th.c1 { z-index: 4; }
+.scr td.tf { width: var(--tfw); min-width: var(--tfw); max-width: var(--tfw); padding: 2px 1px; text-align: center; }
+.scr td.tf.na { cursor: default; }
+.scr .gs { border-left: 1px solid var(--line); }
+.scr .n13 { width: var(--n13w); min-width: var(--n13w); text-align: left; padding: 4px 8px; border-left: 1px solid var(--line); }
+.scr th.c0, .scr th.c1, .scr th.n13 { text-align: left; }
+.scr th.c1 { text-align: right; }
+.scr tbody tr { cursor: pointer; height: 38px; }
+.scr tbody tr.sp, .scr tbody tr.empty-row { height: auto; cursor: default; }
+.scr tbody tr.sp td { padding: 0; border: 0; background: none; }
+.scr tbody tr:hover td { background: var(--sunken); }
+.scr tbody tr.empty-row { cursor: default; }
+.scr tbody tr.empty-row:hover td { background: var(--surface); }
+.scr td:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.th-sort { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; }
+.th-sort:hover { color: var(--fg); }
+.th-sort[aria-pressed="true"] { color: var(--fg); text-decoration: underline; text-underline-offset: 3px; }
+.cc { display: grid; grid-template-columns: 26px minmax(0, 1fr); column-gap: 4px; align-items: center; line-height: 1.3; }
+.cc .rk { font-family: var(--font-mono); color: var(--muted); font-size: 11px; grid-row: span 2; }
+.cc a { font-family: var(--font-mono); font-size: 13px; font-weight: 700; color: var(--fg); text-decoration: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cc a:hover { text-decoration: underline; }
+.cc .kn { font-size: 11.5px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: flex; gap: 6px; align-items: center; min-width: 0; }
+.cc .kn > span:first-child { overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.ex { display: inline-flex; gap: 2px; flex: none; }
+.ex i { font-style: normal; font-size: 9.5px; font-weight: 600; width: 16px; height: 15px; display: grid; place-items: center; border-radius: 3px; background: var(--sunken); color: var(--faint); border: 1px solid var(--line); }
+.ex i.on { background: var(--fg); color: var(--surface); border-color: var(--fg); }
+.ex.lg i { width: 22px; height: 19px; font-size: 11px; border-radius: 4px; }
+.h { display: flex; align-items: center; justify-content: center; gap: 2px; height: 16px; overflow: hidden; }
+.both .h.up { border-bottom: 1px dotted var(--line); }
+.nb { color: var(--faint); font-size: 11px; }
+.sc { font-family: var(--font-mono); font-variant-numeric: tabular-nums; line-height: 1.25; white-space: nowrap; }
+.sc b { font-size: 12.5px; font-weight: 600; }
+.sc .lo { font-size: 10.5px; color: var(--muted); display: block; }
+.sc .ar { font-size: 9px; color: var(--muted); margin-left: 2px; }
+.sc .z { color: var(--faint); }
+.n13c { display: flex; align-items: center; gap: 6px; font-size: 11.5px; white-space: nowrap; }
+.n13c .m { color: var(--muted); font-family: var(--font-mono); }
+.n13c .ar { font-size: 9px; color: var(--muted); }
+.n13c .fc { font: 600 10px/1 var(--font-mono); color: var(--muted); margin-left: -2px; }
+
+/* tooltip */
+.tip { position: fixed; z-index: 40; pointer-events: none; background: var(--surface); color: var(--fg); border: 1px solid var(--line); border-radius: 8px; box-shadow: 0 6px 18px rgb(0 0 0 / .18); padding: 8px 10px; font-size: 12px; max-width: min(360px, calc(100vw - 16px)); display: none; }
+.tip .h1 { font-family: var(--font-mono); font-size: 12px; font-weight: 600; margin-bottom: 2px; }
+.tip .m { color: var(--muted); }
+.tip .sec { margin-top: 6px; padding-top: 6px; border-top: 1px solid var(--line); display: grid; gap: 3px; }
+.tip .sec > b { font-size: 11.5px; }
+.tip .row { display: flex; gap: 6px; align-items: baseline; flex-wrap: wrap; }
+.tip .row .k13, .tip .row .k9 { flex: none; }
+.tip .foot { margin-top: 6px; color: var(--muted); font-size: 11px; }
+
+/* board */
+.phead { display: flex; flex-wrap: wrap; gap: 6px 16px; align-items: baseline; justify-content: space-between; padding: 12px 14px 0; }
+.pbody { padding: 8px 14px 14px; display: grid; gap: 8px; min-width: 0; }
+.cv { position: relative; min-width: 0; }
+.cv canvas { display: block; width: 100%; }
+.bars-legend { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 12px; color: var(--muted); }
+.bars-legend span { display: inline-flex; align-items: center; gap: 5px; }
+.bars-legend i { width: 10px; height: 10px; border-radius: 2px; }
+.tw { overflow-x: auto; min-width: 0; }
+table.mtx { border-collapse: separate; border-spacing: 2px; font-size: 12px; margin: 6px 10px 10px; width: calc(100% - 20px); table-layout: fixed; }
+.mtx th.rh, .mtx th.corner { width: 92px; }
+.mtx.tr th.rh { width: 64px; }
+.mtx th.rh { position: sticky; left: 0; background: var(--surface); z-index: 1; }
+.mtx th { font-weight: 500; color: var(--muted); font-size: 11px; padding: 2px 4px; white-space: nowrap; text-align: center; }
+.mtx th.rh { text-align: right; padding-right: 8px; }
+.mtx.tr th.rh { text-align: left; padding-left: 4px; }
+.mtx.tr th.rh button { padding: 1px 2px; }
+.mtx th button { font: inherit; background: none; border: 0; color: inherit; cursor: pointer; padding: 2px 4px; border-radius: 5px; display: grid; line-height: 1.2; }
+.mtx th button b { font-family: var(--font-mono); font-size: 12px; color: var(--fg); font-weight: 600; }
+.mtx th button[aria-pressed="true"] { background: var(--accent-soft); box-shadow: inset 0 0 0 1px var(--accent); }
+.mtx td { padding: 0; }
+.mtx td button { width: 100%; min-width: 34px; height: 26px; border: 1px solid var(--line); border-radius: 5px; background: var(--surface); font-family: var(--font-mono); font-size: 12px; font-weight: 600; cursor: pointer; color: var(--fg); }
+.mtx td button.z { color: var(--faint); font-weight: 400; cursor: default; }
+.mtx td button[aria-pressed="true"] { box-shadow: 0 0 0 2px var(--fg); }
+.mtx td.cnt { font-family: var(--font-mono); font-size: 11px; color: var(--muted); text-align: center; }
+.pick { padding: 0 14px 12px; display: grid; gap: 6px; font-size: 13px; }
+.pick .list { display: flex; flex-wrap: wrap; gap: 6px; }
+.pick .list a { display: inline-flex; align-items: center; gap: 5px; text-decoration: none; color: var(--fg); border: 1px solid var(--line); border-radius: 999px; padding: 2px 9px 2px 4px; font-family: var(--font-mono); font-size: 12px; }
+.pick .list a:hover { background: var(--sunken); }
+
+/* coin page */
+.dhead { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; justify-content: space-between; }
+.dtitle { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; min-width: 0; }
+.dtitle h1 { font-size: 24px; font-weight: 700; font-family: var(--font-mono); }
+.dtitle .nm { color: var(--muted); }
+.dmeta { font-size: 12.5px; color: var(--muted); display: flex; flex-wrap: wrap; gap: 4px 12px; align-items: center; }
+.navbtns { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+.navpos { font-family: var(--font-mono); font-size: 12px; color: var(--muted); }
+.tvlink { font-size: 13px; font-weight: 600; white-space: nowrap; }
+.chartp { display: grid; gap: 0; scroll-margin-top: calc(var(--appbar-h, 53px) + 8px); }
+.chead { display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: center; justify-content: space-between; padding: 10px 12px 6px; }
+.readout { font-family: var(--font-mono); font-size: 12px; display: flex; flex-wrap: wrap; gap: 2px 10px; align-items: baseline; min-height: 20px; min-width: 0; }
+.readout .d { font-weight: 600; }
+.readout .m { color: var(--muted); }
+.readout .up { color: var(--up); } .readout .dn { color: var(--down); }
+.readout .lb { display: inline-flex; gap: 4px; align-items: center; font-family: var(--font-sans); }
+.zoom { display: flex; gap: 4px; flex-wrap: wrap; }
+.zoom .btn { padding: 3px 9px; font-family: var(--font-mono); }
+.chartbox { padding: 0 4px 0 8px; touch-action: pan-y; }
+.chartbox canvas { cursor: crosshair; }
+.chartbox canvas.drag { cursor: grabbing; }
+.cnote { padding: 6px 12px 10px; display: grid; gap: 4px; }
+.fade-key { display: inline-flex; align-items: center; gap: 6px; }
+.loading { padding: 40px 12px; text-align: center; color: var(--muted); font-size: 13px; }
+.bclabels { position: relative; }
+.xaxis { position: relative; height: 16px; font-family: var(--font-mono); font-size: 10.5px; color: var(--muted); }
+.xaxis span { position: absolute; transform: translateX(-50%); white-space: nowrap; }
+table.lt { border-collapse: collapse; width: max-content; min-width: 100%; font-size: 12.5px; }
+.lt td.wrap { white-space: normal; min-width: 220px; max-width: 460px; }
+.lt th { text-align: left; font-size: 11.5px; color: var(--muted); font-weight: 600; padding: 7px 8px; border-bottom: 1px solid var(--line); white-space: nowrap; background: var(--surface); }
+.lt td { padding: 6px 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
+.lt td.mono, .lt .mono { font-family: var(--font-mono); font-size: 12px; white-space: nowrap; }
+.lt tr.sel td { background: var(--accent-soft); }
+.lt tr.gone td { color: var(--muted); }
+.lt .tfb { font: 600 12px var(--font-mono); background: none; border: 1px solid var(--line); border-radius: 6px; padding: 1px 7px; cursor: pointer; color: var(--fg); }
+.lt .tfb[aria-pressed="true"] { background: var(--fg); color: var(--surface); border-color: var(--fg); }
+.st td { white-space: nowrap; }
+.st td.trg { white-space: normal; min-width: 280px; max-width: 520px; }
+.trg div + div { margin-top: 3px; }
+.trg .ok { color: var(--ok-fg); font-weight: 600; }
+.runs { display: inline-grid; grid-template-columns: auto auto; gap: 0 6px; font-family: var(--font-mono); font-size: 11.5px; }
+.runs .z { color: var(--faint); }
+.more-btn { display: block; margin: 10px auto 12px; }
+
+/* check page */
+.kv { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 4px 16px; font-size: 13px; margin: 0; }
+.kv dt { color: var(--muted); }
+.kv dd { margin: 0; font-family: var(--font-mono); font-size: 12.5px; }
+.okline { font-size: 15px; font-weight: 700; color: var(--ok-fg); }
+.badline { font-size: 15px; font-weight: 700; color: var(--bad-fg); }
+.notes { margin: 0; padding-left: 18px; display: grid; gap: 6px; font-size: 13px; }
+.foot { font-size: 12px; color: var(--muted); display: flex; flex-wrap: wrap; gap: 4px 14px; padding-top: 4px; }
+
+@media (max-width: 720px) {
+  :root { --c0w: 112px; --c1w: 58px; --tfw: 46px; --n13w: 168px; }
+  .appbar-in, .wrap { padding-inline: 12px; }
+  .appbar-in { gap: 0 10px; }
+  .brand { padding-top: 8px; }
+  .tabs a { padding: 10px 9px 9px; font-size: 13.5px; }
+  .scr .c1 { position: static; }
+  .tblw { scroll-padding-left: var(--c0w); }
+  .cc { grid-template-columns: 20px minmax(0, 1fr); }
+  .cc .ex { display: none; }
+  .scr .c0 { padding-inline: 6px 4px; }
+  .dtitle h1 { font-size: 20px; }
+  .search { width: 100%; }
+  .st td.trg { min-width: 220px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { transition: none !important; animation: none !important; scroll-behavior: auto !important; }
+}
+</style>
+
+<header class="appbar">
+  <div class="appbar-in">
+    <div class="brand">TD 시퀀셜 스크리너<small id="asof"></small></div>
+    <nav class="tabs" aria-label="화면">
+      <a href="#screener" id="tab-screener">스크리너</a>
+      <a href="#board" id="tab-board">TD 폭 보드</a>
+      <a href="#coin-btc" id="tab-coin">종목 상세</a>
+      <a href="#check" id="tab-check">검증</a>
+    </nav>
+  </div>
+</header>
+
+<main class="wrap">
+  <div class="banner bad" id="staleNotice" role="alert" hidden></div>
+
+  <!-- screener -->
+  <section id="screen-screener" hidden aria-labelledby="tab-screener">
+    <div class="vstack">
+      <p class="lead" id="scrLead"></p>
+      <div class="panel controls" role="group" aria-label="스크리너 설정">
+        <div class="ctl"><span id="lb-side">방향</span><div class="seg" role="group" aria-labelledby="lb-side" id="sideSeg">
+          <button type="button" data-side="buy">매수 쪽</button><button type="button" data-side="sell">매도 쪽</button><button type="button" data-side="both">양쪽</button></div></div>
+        <div class="ctl"><span id="lb-fam">계열</span><div class="seg fam" role="group" aria-labelledby="lb-fam" id="famSeg"></div></div>
+        <div class="ctl"><span id="lb-nine">9</span><div class="seg" role="group" aria-labelledby="lb-nine" id="nineSeg">
+          <button type="button" data-nines="1">포함</button><button type="button" data-nines="0">빼기</button></div></div>
+        <div class="ctl"><span id="lb-win">기간</span><div class="seg" role="group" aria-labelledby="lb-win" id="winSeg">
+          <button type="button" data-win="0">마지막 봉</button><button type="button" data-win="3">최근 4봉</button><button type="button" data-win="12">최근 13봉</button></div></div>
+        <div class="ctl"><span id="lb-ex">거래소</span><div class="seg" role="group" aria-labelledby="lb-ex" id="exSeg">
+          <button type="button" data-ex="U">업비트</button><button type="button" data-ex="B">빗썸</button><button type="button" data-ex="N">바이낸스</button></div></div>
+        <div class="ctl"><span id="lb-sort">정렬</span><div class="seg" role="group" aria-labelledby="lb-sort" id="sortSeg">
+          <button type="button" data-sort="score">점수</button><button type="button" data-sort="mcap">시가총액</button><button type="button" data-sort="new13">최근 13</button></div></div>
+        <input class="search" id="q" type="search" placeholder="심볼·이름 검색" aria-label="종목 검색" autocomplete="off" spellcheck="false">
+      </div>
+      <div class="legend" id="legend" aria-label="표시 방법"></div>
+      <details class="panel help" id="scoreHelp"><summary>칸과 점수를 읽는 방법</summary><div id="scoreHelpBody"></div></details>
+      <p class="hint" id="scrHint" aria-live="polite"></p>
+      <div class="panel tblw" id="tblw">
+        <table class="scr" id="scr">
+          <caption class="sr-only">종목별, 타임프레임별 TD 신호 표. 방향키로 칸을 옮기고 Enter로 종목 상세를 엽니다.</caption>
+          <thead><tr id="scrHead"></tr></thead>
+          <tbody id="scrBody"></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- breadth board -->
+  <section id="screen-board" hidden aria-labelledby="tab-board">
+    <div class="vstack">
+      <p class="lead">타임프레임마다 봉별로 9와 13을 완성한 종목 수를 셉니다. 많은 종목이 같은 봉에서 함께 9나 13을 완성하면, 시장 전체의 추세가 한쪽으로 오래 이어졌다는 뜻입니다. 지금 종목 목록에 있는 코인만 셉니다.</p>
+      <div class="panel">
+        <div class="phead"><h2>타임프레임별 가장 최근 봉</h2><p class="hint">숫자를 누르면 그 종목들이 나옵니다. 타임프레임을 누르면 아래 차트가 바뀝니다.</p></div>
+        <div class="tw"><table class="mtx" id="mtx"></table></div>
+        <div class="pick" id="mtxPick" aria-live="polite"></div>
+      </div>
+      <div class="panel controls" role="group" aria-label="폭 차트 설정">
+        <div class="ctl"><span id="lb-btf">타임프레임</span><div class="seg tfs" role="group" aria-labelledby="lb-btf" id="btfSeg"></div></div>
+        <div class="ctl"><span id="lb-br">기간</span><div class="seg" role="group" aria-labelledby="lb-br" id="brSeg">
+          <button type="button" data-br="1">1년</button><button type="button" data-br="2">2년</button><button type="button" data-br="5">5년</button><button type="button" data-br="all">전체</button></div></div>
+        <div class="ctl"><span id="lb-bm">단위</span><div class="seg" role="group" aria-labelledby="lb-bm" id="bmSeg">
+          <button type="button" data-bm="n">종목 수</button><button type="button" data-bm="p">비율 %</button></div></div>
+        <div class="ctl"><span id="lb-bn">표시</span><div class="seg" role="group" aria-labelledby="lb-bn" id="bnSeg">
+          <button type="button" data-bn="1">9와 13</button><button type="button" data-bn="0">13만</button></div></div>
+      </div>
+      <div class="panel">
+        <div class="phead"><h2 id="brTitle">봉별 9·13 완성 종목 수</h2><div class="bars-legend" id="brLegend"></div></div>
+        <div class="pbody">
+          <div class="cv"><canvas id="breadth" role="img" aria-label="봉별로 9와 13을 완성한 종목 수 막대 차트. 위는 매도, 아래는 매수입니다."></canvas></div>
+          <p class="hint" id="brHint"></p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- coin page -->
+  <section id="screen-coin" hidden aria-labelledby="tab-coin">
+    <div class="vstack">
+      <div class="dhead">
+        <div style="display:grid;gap:4px;min-width:0"><div class="dtitle" id="dTitle"></div><div class="dmeta" id="dMeta"></div></div>
+        <div class="navbtns"><span class="navpos" id="navPos"></span><button type="button" class="btn" id="prevCoin">← 이전 종목</button><button type="button" class="btn" id="nextCoin">다음 종목 →</button></div>
+      </div>
+      <div class="panel controls" role="group" aria-label="차트 설정">
+        <div class="ctl"><span id="lb-tf">타임프레임</span><div class="seg tfs" role="group" aria-labelledby="lb-tf" id="tfSeg"></div></div>
+        <div class="ctl"><span id="lb-sc">가격 축</span><div class="seg" role="group" aria-labelledby="lb-sc" id="scaleSeg">
+          <button type="button" data-scale="lin">선형</button><button type="button" data-scale="log">로그</button></div></div>
+        <a class="tvlink" id="tvLink" target="_blank" rel="noopener">TradingView에서 열기 ↗</a>
+      </div>
+      <div class="panel chartp">
+        <div class="chead">
+          <div class="readout" id="readout" aria-live="off"></div>
+          <div class="zoom" role="group" aria-label="차트 이동과 확대">
+            <button type="button" class="btn" data-z="in" aria-label="확대">+</button><button type="button" class="btn" data-z="out" aria-label="축소">−</button>
+            <button type="button" class="btn" data-z="left" aria-label="과거 쪽으로">◀</button><button type="button" class="btn" data-z="right" aria-label="최근 쪽으로">▶</button>
+            <button type="button" class="btn" data-z="reset">최근 150봉</button>
+          </div>
+        </div>
+        <div class="cv chartbox" id="chartBox"><canvas id="chart" tabindex="0" role="img" aria-label="캔들 차트와 TD 라벨. 방향키로 옮기고 +, − 키로 확대합니다."></canvas><div class="loading" id="chartWait" hidden></div></div>
+        <div class="cnote" id="chartNote"></div>
+      </div>
+      <div class="panel">
+        <div class="phead"><h2>TD 바코드</h2><div class="seg" role="group" aria-label="바코드 기간" id="bcSeg">
+          <button type="button" data-bc="1">1년</button><button type="button" data-bc="2">2년</button><button type="button" data-bc="5">5년</button><button type="button" data-bc="all">전체</button></div></div>
+        <div class="pbody">
+          <p class="hint">한 줄이 한 타임프레임입니다. 가운데 선 위는 매도, 아래는 매수입니다. 계열 색 막대는 13, 회색 막대는 9입니다. 누르면 그 타임프레임과 날짜로 차트를 옮깁니다.</p>
+          <div class="cv"><canvas id="bcode" role="img" aria-label="20개 타임프레임의 9와 13 위치를 같은 날짜 축에 표시한 바코드"></canvas></div>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="phead"><h2>타임프레임별 상태</h2></div>
+        <div class="pbody">
+          <p class="hint">셋업은 지금 이어지는 셋업 카운트입니다. 계열 칸은 진행 중인 카운트다운 수와 그중 가장 높은 카운트입니다(▼ 매수, ▲ 매도). 다음 봉 조건은 진행 중인 봉이 어떤 가격으로 마감하면 9나 13이 나오는지 보여 줍니다. 같은 계열과 방향의 13 조건이 한 봉에서 함께 맞으면 차트에는 13x2처럼 라벨 하나로 나옵니다.</p>
+          <p class="hint" id="stNote" hidden>이 빌드에는 다음 봉 조건 계산이 아직 없습니다.</p>
+          <div class="tw"><table class="lt st" id="stateTbl"></table></div>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="phead"><h2 id="llTitle">라벨 목록</h2></div>
+        <div class="pbody">
+          <p class="hint" id="llHint"></p>
+          <div class="tw"><table class="lt" id="labelTbl"></table></div>
+          <div id="llMore"></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- verification -->
+  <section id="screen-check" hidden aria-labelledby="tab-check">
+    <div class="vstack">
+      <div class="panel pad"><h2>데이터 신선도</h2><div id="ckFresh"></div></div>
+      <div class="panel pad"><h2>두 구현 비교 검증</h2><div id="ckVerify"></div></div>
+      <div class="panel pad"><h2>차트와 맞춰 볼 신호</h2>
+        <p class="hint">시가총액 상위 종목의 최근 9와 13입니다. TradingView에서 같은 타임프레임, 같은 날짜의 봉에 같은 라벨이 있는지 확인하세요. 날짜는 봉이 시작하는 날입니다.</p>
+        <div class="tw"><table class="lt" id="ckChecks"></table></div>
+      </div>
+      <div class="panel pad"><h2>알아 둘 점</h2>
+        <ul class="notes">
+          <li>TradingView 차트는 이 지표의 라벨을 최근 400개까지만 남깁니다. 그보다 오래된 9와 13은 차트에서 지워집니다. 이 사이트의 종목 상세 차트는 그런 라벨을 흐리게 그립니다.</li>
+          <li>1D부터 10D까지는 TradingView 일봉으로, 1W·2W·3W는 TradingView 자체 1W 봉으로, 1M부터 12M까지는 자체 1M 봉으로 만듭니다. 1W와 1M 차트는 TradingView 자체 봉을 그리는데, 이 봉에는 일봉에서 나중에 고쳐진 가격이 남아 있을 수 있어서 일봉을 합친 값과 다를 수 있기 때문입니다. 2W와 3W는 로그인 없이 받을 수 없어서, TradingView도 1W 봉을 묶어 만든다고 보고 같은 방법으로 만듭니다.</li>
+          <li>일부 티커는 TradingView가 요청할 때마다 두 가지 이력 중 하나를 보냅니다(2026-11-01에 본 티커: RSR, RVN, GHX, ARPA, BNB, USUAL, ZEC, AVU). 차트가 어느 이력을 받는지는 알 수 없어서, 이 티커들의 9와 13은 차트와 다를 수 있습니다. 두 이력에서 9와 13이 실제로 달라지는 티커는 RSR과 AVU입니다. AVU는 한쪽 이력에 2024-08-28부터 270일이 빠져 있고, 한 번은 일봉과 1W 봉이 서로 다른 이력으로 왔습니다.</li>
+          <li>TradingView 5,000봉 요금제에서는 BTC 1D 차트가 더 늦은 날짜부터 시작합니다. 그래서 2013년 이전 BTC 1D 라벨은 차트와 다를 수 있습니다.</li>
+          <li>TradingView에 봉이 없는 날은 봉으로 치지 않고, 빈 날을 채우지도 않습니다. 진행 중인 봉은 세지 않고, 마감된 봉만 셉니다.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <footer class="foot" id="foot">
+    <span>코인 목록, 순위, 시가총액: CoinGecko · <a href="https://www.coingecko.com" target="_blank" rel="noopener">Data provided by CoinGecko</a></span>
+    <span>가격: TradingView CRYPTO:&lt;코인&gt;USD 일봉, 1W 봉, 1M 봉</span>
+    <span>지표: TD Research v6 기본 설정</span>
+  </footer>
+</main>
+<div class="tip" id="tip" role="tooltip"></div>
+
+<script>
+const DATA = /*__DATA__*/null;
+/*__BARS__*/
+/*__ENGINE__*/
+// ====================================================================================================
+// TD Sequential screener page. BARS (dashboard/bars.js) and TD (dashboard/td-engine.js) are the same modules the
+// build used, so the coin page recounts a coin from exactly the bars the screener summary came from.
+// ====================================================================================================
+const TFS = DATA.tfs, OPT = DATA.options, LAST = DATA.lastClosedDayN, DAY = 86400000;
+const COINS = DATA.coins;
+const tip = document.getElementById('tip');
+const $ = (id) => document.getElementById(id);
+function el(tag, cls, text) { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
+const esc = (s) => String(s).replace(/[&<>"']/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
+const iso = (d) => BARS.isoOfDay(d);
+const nf = (v) => Number(v).toLocaleString('en-US');
+const BUY = -1, SELL = 1;
+const SIDE = { [BUY]: '매수', [SELL]: '매도' };
+const ARROW = { [BUY]: '▼', [SELL]: '▲' };
+
+// ---------- families and colors (the indicator's inputs) ----------
+const FAM_NAME = ['Sequential', 'Aggressive Sequential', 'Combo', 'Aggressive Combo'];
+const FAM_FULL = TD.FAMILY_NAMES || ['Sequential', 'Aggressive Sequential', 'Combo', 'Aggressive Combo candidate'];
+const FAM_CODE = ['S', 'AS', 'C', 'AC']; // the status panel's short names (AC* there), so a family is not told by color alone
+const FAM_COLOR = [OPT.seqColor, OPT.aggSeqColor, OPT.comboColor, OPT.aggComboColor];
+const FAM_ON = [OPT.enableSeq, OPT.enableAggSeq, OPT.enableCombo, OPT.enableAggCombo];
+const FAMS = [0, 1, 2, 3].filter((f) => FAM_ON[f]);
+const SETUP_COLOR = OPT.setupColor || '#787B86';
+function hexRgb(hex) { const h = String(hex).replace('#', ''); return [0, 2, 4].map((i) => parseInt(h.slice(i, i + 2), 16)); }
+function relLum(c) { const f = (v) => { v /= 255; return v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; }; return 0.2126 * f(c[0]) + 0.7152 * f(c[1]) + 0.0722 * f(c[2]); }
+function inkOn(hex) { const L = relLum(hexRgb(hex)), dark = relLum([20, 25, 34]); return 1.05 / (L + 0.05) >= (L + 0.05) / (dark + 0.05) ? '#ffffff' : '#141922'; }
+{
+  const st = document.documentElement.style;
+  FAM_COLOR.forEach((c, f) => { st.setProperty('--f' + f, c); st.setProperty('--fi' + f, inkOn(c)); });
+  st.setProperty('--setup', SETUP_COLOR);
+}
+const C = {}; // canvas colors of the current theme
+function readColors() {
+  const cs = getComputedStyle(document.documentElement);
+  for (const k of ['fg', 'muted', 'faint', 'line', 'surface', 'sunken', 'accent', 'up', 'down', 'bg']) C[k] = cs.getPropertyValue('--' + k).trim();
+}
+
+// ---------- timeframes ----------
+const DPB = { '1D': 1, '2D': 2, '3D': 3, '4D': 4, '5D': 5, '6D': 6, '1W': 7, '8D': 8, '9D': 9, '10D': 10, '2W': 14, '3W': 21,
+  '1M': 30.4, '2M': 60.9, '3M': 91.3, '4M': 121.7, '6M': 182.6, '8M': 243.5, '10M': 304.4, '12M': 365.25 };
+const WEIGHT = TFS.map((tf) => 1 + Math.log2(DPB[tf] || 1));
+const GROUP_START = new Set([TFS.indexOf('8D'), TFS.indexOf('1M')]); // 1D…1W | 8D…3W | 1M…12M
+const tvInterval = (tf) => { const m = /^(\d+)([DWM])$/.exec(tf); return (m[1] === '1' ? '' : m[1]) + m[2]; };
+const tvUrl = (usd, tf) => `https://www.tradingview.com/chart/?symbol=${encodeURIComponent(usd)}&interval=${tvInterval(tf)}`;
+
+// ---------- numbers ----------
+function fmtPrice(v) {
+  if (v == null || !Number.isFinite(v)) return '–';
+  const a = Math.abs(v);
+  let s = Number(v.toPrecision(a >= 1 ? 12 : 10)).toString();
+  if (/e/i.test(s)) s = v.toFixed(Math.min(20, Math.max(0, 8 - Math.floor(Math.log10(a))))).replace(/0+$/, '').replace(/\.$/, '');
+  const neg = s.startsWith('-'); if (neg) s = s.slice(1);
+  const [i, f] = s.split('.');
+  return (neg ? '-' : '') + i.replace(/\B(?=(\d{3})+(?!\d))/g, ',') + (f ? '.' + f : '');
+}
+function fmtCap(v) {
+  if (!(v > 0)) return '–';
+  const [d, u] = v >= 1e12 ? [1e12, 'T'] : v >= 1e9 ? [1e9, 'B'] : v >= 1e6 ? [1e6, 'M'] : [1e3, 'K'];
+  const x = v / d; return '$' + (x >= 100 ? x.toFixed(0) : x >= 10 ? x.toFixed(1) : x.toFixed(2)) + u;
+}
+const fmtScore = (v) => (v >= 99.95 ? v.toFixed(0) : v.toFixed(1));
+const pctText = (a, b) => (b ? (a / b * 100).toFixed(a / b >= 0.1 ? 0 : 1) + '%' : '–');
+
+// ---------- state, kept in localStorage when it is there ----------
+const state = { side: 'both', fam: FAMS.slice(), nines: true, win: 3, ex: [], sort: 'score', q: '',
+  btf: '1D', br: '1', bm: 'n', bn: true, tf: '1D', scale: 'lin', bc: '5', screen: 'screener', coin: 'btc' };
+const SAVE = ['side', 'fam', 'nines', 'win', 'ex', 'sort', 'btf', 'br', 'bm', 'bn', 'tf', 'scale', 'bc'];
+try {
+  const s = JSON.parse(localStorage.getItem('td-screener') || '{}');
+  for (const k of SAVE) if (k in s) state[k] = s[k];
+} catch (e) { /* no storage: defaults */ }
+if (!['buy', 'sell', 'both'].includes(state.side)) state.side = 'both';
+state.fam = (Array.isArray(state.fam) ? state.fam : FAMS).filter((f) => FAMS.includes(f));
+state.nines = state.nines !== false;
+if (![0, 3, 12].includes(state.win)) state.win = 3;
+state.ex = (Array.isArray(state.ex) ? state.ex : []).filter((x) => ['U', 'B', 'N'].includes(x));
+if (!['score', 'mcap', 'new13'].includes(state.sort)) state.sort = 'score';
+if (!TFS.includes(state.btf)) state.btf = '1D';
+if (!TFS.includes(state.tf)) state.tf = '1D';
+if (!['1', '2', '5', 'all'].includes(state.br)) state.br = '1';
+if (!['1', '2', '5', 'all'].includes(state.bc)) state.bc = '5';
+if (!['n', 'p'].includes(state.bm)) state.bm = 'n';
+state.bn = state.bn !== false;
+if (!['lin', 'log'].includes(state.scale)) state.scale = 'lin';
+function save() { try { const o = {}; for (const k of SAVE) o[k] = state[k]; localStorage.setItem('td-screener', JSON.stringify(o)); } catch (e) { /* ignore */ } }
+let FAM_SEL = [0, 1, 2, 3].map((f) => state.fam.includes(f));
+const sideDirs = () => (state.side === 'both' ? [SELL, BUY] : state.side === 'sell' ? [SELL] : [BUY]);
+
+// ---------- coins: hash slugs (ASCII letters, digits, hyphens) ----------
+const SLUG = new Map();
+for (const c of COINS) { const s = c.s.toLowerCase(); if (/^[a-z0-9-]+$/.test(s) && !SLUG.has(s)) { c.slug = s; SLUG.set(s, c); } }
+for (const c of COINS) {
+  if (c.slug) continue;
+  let s = (c.usd || '').replace(/^[^:]*:/, '').replace(/USD$/i, '').toLowerCase().replace(/[^a-z0-9-]+/g, '') || 'rank' + c.r;
+  while (SLUG.has(s)) s += '-' + c.r;
+  c.slug = s; SLUG.set(s, c);
+}
+const EX_NAME = { U: '업비트', B: '빗썸', N: '바이낸스' };
+const ADDED_NOTE = '업비트·빗썸·바이낸스 미상장(직접 추가한 종목)';
+const exNames = (c) => ['U', 'B', 'N'].filter((x) => c.x.includes(x)).map((x) => EX_NAME[x]).join(' · ') || ADDED_NOTE;
+const exChips = (c, cls) => `<span class="ex${cls ? ' ' + cls : ''}" title="${esc(exNames(c))}">${[['U', '업'], ['B', '빗'], ['N', '바']].map(([x, l]) => `<i class="${c.x.includes(x) ? 'on' : ''}">${l}</i>`).join('')}</span>`;
+const nameOf = (c) => c.k || c.n;
+
+// ---------- calendar buckets: bar dates from "bars ago" in the summary ----------
+// Every timeframe's buckets tile the calendar (dashboard/bars.js bucketFn). A coin's confirmed bars are exactly the
+// buckets from its first daily bar to its last confirmed bar when none is skipped (a day without a TradingView bar
+// can leave a bucket empty); then "k bars ago" is k buckets back. Otherwise the date is only known on the coin page.
+const BASE = (() => { let m = LAST; for (const c of COINS) if (c.li != null && c.li < m) m = c.li; return Date.UTC(new Date(m * DAY).getUTCFullYear(), 0, 1) / DAY; })();
+const BUCK = new Map();
+function bucketStarts(tf) {
+  let a = BUCK.get(tf); if (a) return a;
+  const f = BARS.bucketFn(tf), se = [0, 0], out = [];
+  f(BASE, se); let d = se[0];
+  while (d <= LAST + 800) { out.push(d); f(d, se); d = se[1] + 1; }
+  a = Int32Array.from(out); BUCK.set(tf, a); return a;
+}
+function bucketIndex(a, day) { let lo = 0, hi = a.length - 1; if (day < a[0]) return -1; while (lo < hi) { const mid = (lo + hi + 1) >> 1; if (a[mid] <= day) lo = mid; else hi = mid - 1; } return lo; }
+function datesExact(c, j) {
+  const T = c.t[j]; if (!c.ex_) c.ex_ = [];
+  if (c.ex_[j] === undefined) { const a = bucketStarts(TFS[j]); c.ex_[j] = c.li != null && bucketIndex(a, T.ls) - bucketIndex(a, c.li) + 1 === T.n; }
+  return c.ex_[j];
+}
+function agoBar(c, j, ago) { // {s: start day, e: end day, exact}
+  const T = c.t[j], a = bucketStarts(TFS[j]), i = bucketIndex(a, T.ls) - ago;
+  return { s: a[Math.max(0, i)], e: a[Math.max(0, i) + 1] - 1, exact: ago === 0 || datesExact(c, j) };
+}
+const agoText = (ago) => (ago === 0 ? '마지막 봉' : ago + '봉 전');
+// the bar that starts on a known day (l13 carries it): exact whatever the gaps
+const BUCKET_FN = new Map();
+function barOfDay(tf, day) {
+  let f = BUCKET_FN.get(tf); if (!f) { f = BARS.bucketFn(tf); BUCKET_FN.set(tf, f); }
+  const se = f(day, [0, 0]); return { s: se[0], e: se[1], exact: true };
+}
+
+// ---------- labels in the summary ----------
+// rl: [barsAgo, kind, dir, family, text] on the last 13 bars, plus the raw setup count for a Setup label
+// ([barsAgo, 'S', dir, null, text, raw]); l9: [barsAgo, dir, text, raw]; l13: [barsAgo, dir, family, text, bar start day]
+function labelValue(kind, text, repeated) {
+  if (kind === 'C') { const m = /13(r?)(?:x(\d+))?$/.exec(text) || []; return 3 + (m[2] ? Number(m[2]) - 1 : 0) + (m[1] ? 0.5 : 0); }
+  if (kind === 'S') return text === '9*' ? 1.5 : repeated ? 0.5 : 1;
+  return 0.5; // +13 deferral
+}
+// a display 9 whose raw setup count is 18, 27, ... (wrapSetup draws it as 9 again)
+const repeated9 = (L) => L[1] === 'S' && L[5] >= 18;
+const poBar = (po) => ({ o: po[0], h: po[1], l: po[2], c: po[3] });
+function cmpOp(x, op, v) { return op === '<' ? x < v : op === '<=' ? x <= v : op === '>' ? x > v : op === '>=' ? x >= v : false; }
+const groupHolds = (g, bar) => g.every(([s, op, v]) => cmpOp(s === 'hl' ? bar.h - bar.l : bar[s], op, v));
+function evalTg(t, bar) {
+  if (typeof TD.evalTrigger === 'function') return TD.evalTrigger(t, bar);
+  return groupHolds(t.all || [], bar) && (!t.any || t.any.some((g) => groupHolds(g, bar))) && !(t.unless && t.unless.some((g) => groupHolds(g, bar)));
+}
+const famOkTg = (t) => (t.k === 'C13' ? FAM_SEL[t.f] : state.nines);
+// next-bar triggers come with the engine (TD.nextBarTriggers) and the build's summary (tg); older builds have neither
+const HAS_TG = typeof TD.nextBarTriggers === 'function' || COINS.some((c) => c.t && c.t.some((T) => T && Array.isArray(T.tg)));
+const HAS_PO = COINS.some((c) => c.t && c.t.some((T) => T && Array.isArray(T.po)));
+
+// The cell of one coin, timeframe and side under the current settings.
+function cellInfo(c, j, dir) {
+  const T = c.t && c.t[j]; if (!T) return null;
+  const labels = [];
+  for (const L of T.rl) {
+    const [ago, kind, d, f, text] = L;
+    if (d !== dir || ago > state.win) continue;
+    if (kind === 'S') { if (!state.nines || !text.startsWith('9')) continue; }
+    else if (kind === 'C' || kind === 'I') { if (!FAM_SEL[f]) continue; }
+    else continue;
+    const rep = repeated9(L);
+    labels.push({ ago, kind, f, text, rep, v: labelValue(kind, text, rep) });
+  }
+  let best = null;
+  for (const x of labels) if (!best || x.v > best.v || (x.v === best.v && x.ago < best.ago)) best = x;
+  let prog = null;
+  if (!best) {
+    let hi = 0, hf = -1;
+    for (const f of FAMS) if (FAM_SEL[f]) { const s = (f * 2 + (dir === SELL ? 1 : 0)) * 2; if (T.ru[s] > 0 && T.ru[s + 1] > hi) { hi = T.ru[s + 1]; hf = f; } }
+    if (hi >= 10) prog = { cd: true, n: hi, f: hf };
+    else if (state.nines) { const r = dir === BUY ? T.br : T.sr; if (r >= 7) prog = { cd: false, n: r }; }
+  }
+  let trig = null;
+  if (Array.isArray(T.tg)) for (const t of T.tg) {
+    if (t.d !== dir || !famOkTg(t)) continue;
+    if (!trig) trig = { list: [], live: false, f: null };
+    trig.list.push(t);
+    if (T.po && evalTg(t, poBar(T.po))) trig.live = true;
+    if (t.k === 'C13' && trig.f == null) trig.f = t.f;
+  }
+  return { T, labels, best, prog, trig };
+}
+// side score: sum over timeframes of weight x (value x 1 / (1 + barsAgo) + next-bar trigger points)
+function sideScore(c, dir, parts) {
+  if (!c.t) return 0;
+  let s = 0;
+  for (let j = 0; j < TFS.length; j++) {
+    const T = c.t[j]; if (!T) continue;
+    let v = 0;
+    for (const L of T.rl) {
+      const [ago, kind, d, f, text] = L;
+      if (d !== dir) continue;
+      if (kind === 'S') { if (state.nines && ago <= 3 && text.startsWith('9')) v += labelValue('S', text, repeated9(L)) / (1 + ago); }
+      else if ((kind === 'C' || kind === 'I') && FAM_SEL[f] && ago <= 12) v += labelValue(kind, text) / (1 + ago);
+    }
+    if (Array.isArray(T.tg)) {
+      let fm = 0, nine = false;
+      for (const t of T.tg) { if (t.d !== dir || !famOkTg(t)) continue; if (t.k === 'C13') fm |= 1 << t.f; else nine = true; }
+      for (let f = 0; f < 4; f++) if (fm & (1 << f)) v += 1.5;
+      if (nine) v += 0.5;
+    }
+    if (v > 0) { s += WEIGHT[j] * v; if (parts) parts.push([j, WEIGHT[j] * v]); }
+  }
+  return s;
+}
+// the newest 13 of the chosen sides and families: each timeframe's newest 13 (l13), or one on its last 13 bars
+function newest13(c, dirs) {
+  if (!c.t) return null;
+  let best = null;
+  c.t.forEach((T, j) => {
+    if (!T) return;
+    let cand = null;
+    if (T.l13 && dirs.includes(T.l13[1]) && FAM_SEL[T.l13[2]]) cand = { ago: T.l13[0], dir: T.l13[1], f: T.l13[2], text: T.l13[3], day: T.l13[4] };
+    else for (let i = T.rl.length - 1; i >= 0; i--) { const L = T.rl[i]; if (L[1] === 'C' && dirs.includes(L[2]) && FAM_SEL[L[3]]) { cand = { ago: L[0], dir: L[2], f: L[3], text: L[4] }; break; } }
+    if (!cand) return;
+    const b = cand.day != null ? barOfDay(TFS[j], cand.day) : agoBar(c, j, cand.ago), key = b.e * 32 + j; // newest bar end first; on the same day the longer timeframe
+    if (!best || key > best.key) best = { ...cand, j, s: b.s, e: b.e, exact: b.exact, key };
+  });
+  return best;
+}
+
+// ---------- marks as HTML (table) ----------
+function chipHTML(kind, text, f) {
+  if (kind === 'C') return `<b class="k13" style="--c:var(--f${f});--i:var(--fi${f})">${esc(text)}</b>`;
+  if (kind === 'S') return `<b class="k9">${esc(text)}</b>`;
+  return `<b class="kd" style="--c:var(--f${f})">${esc(text)}</b>`;
+}
+function chipEl(kind, text, f) { const t = document.createElement('template'); t.innerHTML = chipHTML(kind, text, f); return t.content.firstChild; }
+function halfHTML(c, j, dir) {
+  const x = cellInfo(c, j, dir); let s = '';
+  if (x.best) s = chipHTML(x.best.kind, x.best.text, x.best.f) + (x.best.ago ? `<i class="ago">${x.best.ago}</i>` : '');
+  else if (x.prog) s = x.prog.cd ? `<span class="pg" style="color:var(--f${x.prog.f})">${x.prog.n}</span>` : `<span class="pg su">${x.prog.n}</span>`;
+  if (x.trig) s += `<i class="tgd${x.trig.live ? ' on' : ''}" style="--c:${x.trig.f != null ? `var(--f${x.trig.f})` : 'var(--setup)'}"></i>`;
+  return s;
+}
+function tfCellHTML(c, j, dirs) {
+  const T = c.t && c.t[j];
+  if (!T) return '<span class="nb">·</span>';
+  if (dirs.length === 2) return `<div class="h up">${halfHTML(c, j, SELL)}</div><div class="h dn">${halfHTML(c, j, BUY)}</div>`;
+  return `<div class="h">${halfHTML(c, j, dirs[0])}</div>`;
+}
+function scoreHTML(r, dirs) {
+  if (!r.c.t) return '<span class="z">–</span>';
+  if (dirs.length === 1) { const v = dirs[0] === SELL ? r.sell : r.buy; return v > 0 ? `<b>${fmtScore(v)}</b>` : '<span class="z">0</span>'; }
+  const [hiD, hiV, loD, loV] = r.sell >= r.buy ? [SELL, r.sell, BUY, r.buy] : [BUY, r.buy, SELL, r.sell];
+  if (hiV <= 0) return '<span class="z">0</span>';
+  return `<b>${fmtScore(hiV)}</b><span class="ar">${ARROW[hiD]}</span>` + (loV > 0 ? `<span class="lo">${fmtScore(loV)}<span class="ar">${ARROW[loD]}</span></span>` : '');
+}
+function n13HTML(c, n) {
+  if (!n) return c.t ? '<span class="nb">없음</span>' : '<span class="nb">데이터 없음</span>';
+  return `<div class="n13c">${chipHTML('C', n.text, n.f)}<span class="fc">${FAM_CODE[n.f]}</span><span class="ar">${ARROW[n.dir]}</span><span>${TFS[n.j]}</span><span class="m">${n.exact ? iso(n.s) : agoText(n.ago)}</span></div>`;
+}
+
+// ---------- tooltip ----------
+function placeTip(x, y) {
+  tip.style.display = 'block';
+  const pad = 14, w = tip.offsetWidth, h = tip.offsetHeight, vw = document.documentElement.clientWidth;
+  let px = x + pad, py = y + pad;
+  if (px + w > vw - 8) px = x - w - pad;
+  if (py + h > innerHeight - 8) py = y - h - pad;
+  tip.style.left = Math.max(8, Math.min(px, vw - w - 8)) + 'px'; tip.style.top = Math.max(8, Math.min(py, innerHeight - h - 8)) + 'px';
+}
+function showTip(x, y, nodes) { tip.replaceChildren(...nodes); placeTip(x, y); }
+function hideTip() { tip.style.display = 'none'; TIP_KEY = null; }
+let TIP_KEY = null;
+const tipRow = (...parts) => { const r = el('div', 'row'); for (const p of parts) r.append(typeof p === 'string' ? el('span', null, p) : p); return r; };
+const muted = (t) => el('span', 'm', t);
+
+// ---------- next-bar triggers in words ----------
+const SRC_KO = { o: '시가', h: '고가', l: '저가', c: '종가', hl: '고가와 저가의 차이' };
+const OP_KO = { '<': '미만', '<=': '이하', '>': '초과', '>=': '이상' };
+const condText = ([s, op, v]) => `${SRC_KO[s] || s}가 ${fmtPrice(v)} ${OP_KO[op] || op}`;
+const groupText = (g) => g.map(condText).join('이고 ');
+// an empty group always holds: in `any` it makes the whole `any` part hold, in `unless` it cancels the label
+function trigWhat(t) {
+  if (t.k === 'C13') return `${SIDE[t.d]} 13 (${FAM_NAME[t.f] || '계열 ' + t.f}${t.o != null ? `, 시작 봉 ${iso(t.o)}` : ''})`;
+  if (t.k === 'S9r') return `${SIDE[t.d]} 9 (반복 9)`;
+  return `${SIDE[t.d]} 9`;
+}
+function trigText(t) {
+  const parts = [];
+  if (t.all && t.all.length) parts.push(groupText(t.all));
+  if (t.any && t.any.length && !t.any.some((g) => !g.length)) parts.push(t.any.length === 1 ? groupText(t.any[0]) : t.any.map(groupText).join('이거나 '));
+  let s = parts.length ? `이번 봉 ${parts.join('이고, ')}이면 ${trigWhat(t)}` : `이번 봉이 마감하면 가격과 상관없이 ${trigWhat(t)}`;
+  if (t.unless && t.unless.some((g) => !g.length)) s += '. 단, 이번 봉에서는 취소됩니다';
+  else if (t.unless && t.unless.length) s += `. 단, ${t.unless.map(groupText).join(' 또는 ')}이면 취소`;
+  return s;
+}
+
+// ====================================================================================================
+// screener
+// ====================================================================================================
+const ROWS = new Map(); // slug -> { c, tr, td, html, sell, buy, score, n13 }
+let ORDER = [];
+let FOCUS = { slug: null, col: 0 };
+const NCOL = 2 + TFS.length + 1;
+function coinCellHTML(c) {
+  return `<div class="cc"><span class="rk">${c.r}</span><a href="#coin-${c.slug}" tabindex="-1">${esc(c.s)}</a><span class="kn"><span>${esc(nameOf(c))}</span>${exChips(c)}</span></div>`;
+}
+// Rows are virtual: each row's DOM is made once, when it first comes into view, and reused after that. Only the rows
+// in view (and a buffer) sit in the table, between two spacer rows, so sorting, filtering and changing a setting lay
+// out about 40 rows instead of 566. A settings change recomputes every coin's scores (for the order) and marks the
+// rows; a row's cells are rewritten when it is shown, and only the cells whose HTML changed.
+function scoreRow(r, dirs) {
+  const c = r.c;
+  r.sell = dirs.includes(SELL) ? sideScore(c, SELL) : 0;
+  r.buy = dirs.includes(BUY) ? sideScore(c, BUY) : 0;
+  r.score = c.t ? Math.max(r.sell, r.buy) : -1;
+  r.n13 = newest13(c, dirs);
+  r.dirty = true;
+}
+function cellsHTML(r, dirs) {
+  const h = [null, scoreHTML(r, dirs)];
+  for (let j = 0; j < TFS.length; j++) h.push(tfCellHTML(r.c, j, dirs));
+  h.push(n13HTML(r.c, r.n13));
+  return h;
+}
+const SHELL = document.createElement('tbody');
+function ensureRow(r) {
+  if (!r.tr) {
+    const c = r.c, h = cellsHTML(r, sideDirs());
+    SHELL.innerHTML = `<tr data-s="${c.slug}"><td class="c0">${coinCellHTML(c)}</td><td class="c1 sc">${h[1]}</td>${TFS.map((_, j) => `<td class="tf${GROUP_START.has(j) ? ' gs' : ''}${c.t && c.t[j] ? '' : ' na'}" data-j="${j}">${h[2 + j]}</td>`).join('')}<td class="n13">${h[NCOL - 1]}</td></tr>`;
+    r.tr = SHELL.firstElementChild; SHELL.removeChild(r.tr); r.td = Array.from(r.tr.cells); r.html = h; r.dirty = false;
+    if (FOCUS.slug === c.slug) r.td[FOCUS.col].tabIndex = 0;
+  } else if (r.dirty) {
+    const h = cellsHTML(r, sideDirs());
+    for (let i = 1; i < NCOL; i++) if (h[i] !== r.html[i]) { r.html[i] = h[i]; r.td[i].innerHTML = h[i]; }
+    r.dirty = false;
+  }
+  return r;
+}
+function buildTable() {
+  const head = [`<th class="c0" scope="col"><button type="button" class="th-sort" data-sort="mcap">#  종목</button></th>`,
+    `<th class="c1" scope="col"><button type="button" class="th-sort" data-sort="score">점수</button></th>`,
+    ...TFS.map((tf, j) => `<th class="tf${GROUP_START.has(j) ? ' gs' : ''}" scope="col" title="${tf} · 가중치 ${WEIGHT[j].toFixed(2)}">${tf}</th>`),
+    `<th class="n13" scope="col"><button type="button" class="th-sort" data-sort="new13">최근 13</button></th>`];
+  $('scrHead').innerHTML = head.join('');
+  for (const c of COINS) ROWS.set(c.slug, { c, tr: null, td: null, html: null, dirty: true });
+  VT.top = spacerRow(); VT.bot = spacerRow();
+  rescore();
+}
+function rescore() {
+  FAM_SEL = [0, 1, 2, 3].map((f) => state.fam.includes(f));
+  const dirs = sideDirs();
+  $('scr').classList.toggle('both', dirs.length === 2);
+  for (const r of ROWS.values()) scoreRow(r, dirs);
+}
+const VT = { list: [], first: 0, last: -1, rowH: 38, raf: 0, top: null, bot: null };
+function spacerRow() { const tr = el('tr', 'sp'); tr.setAttribute('aria-hidden', 'true'); const td = el('td'); td.colSpan = NCOL; tr.append(td); return tr; }
+const theadH = () => $('scr').tHead.offsetHeight || 34;
+function renderSlice(force) {
+  const box = $('tblw'), tb = $('scrBody'), list = VT.list, n = list.length;
+  if (!n) return;
+  // the box is never taller than the window; while it is still empty its own height says nothing
+  const per = VT.rowH, y = Math.max(0, box.scrollTop - theadH()), h = Math.max(box.clientHeight, innerHeight);
+  const first = Math.max(0, Math.floor(y / per) - 10), last = Math.min(n - 1, Math.ceil((y + h) / per) + 10);
+  if (!force && first === VT.first && last === VT.last) return;
+  VT.first = first; VT.last = last;
+  const rows = [];
+  for (let i = first; i <= last; i++) { const r = ensureRow(list[i]); r.tr.setAttribute('aria-rowindex', String(i + 2)); rows.push(r.tr); }
+  VT.top.firstChild.style.height = first * per + 'px';
+  VT.bot.firstChild.style.height = (n - 1 - last) * per + 'px';
+  tb.replaceChildren(VT.top, ...rows, VT.bot);
+  // every row is the same height; measure it once it is laid out (fonts, zoom) and lay out again if it differs
+  const mh = rows[0].getBoundingClientRect().height;
+  if (mh > 0 && Math.abs(mh - per) > 0.25) { VT.rowH = mh; renderSlice(true); return; }
+  // keep the table's one tab stop on a row in view, so Tab enters the table where the user is looking
+  const fi = FOCUS.slug ? ORDER.indexOf(FOCUS.slug) : -1;
+  const vf = Math.min(n - 1, Math.floor(y / per)), vl = Math.max(vf, Math.floor((y + box.clientHeight - theadH()) / per) - 1);
+  if ((fi < vf || fi > vl) && !tb.contains(document.activeElement)) moveTabStop(list[Math.min(last, Math.max(first, vf))].c.slug, FOCUS.col);
+}
+function moveTabStop(slug, col) {
+  const p = FOCUS.slug && ROWS.get(FOCUS.slug); if (p && p.td) p.td[FOCUS.col].tabIndex = -1;
+  FOCUS = { slug, col }; const r = slug && ROWS.get(slug); if (r && r.td) r.td[col].tabIndex = 0;
+}
+const matchQ = (c, q) => c.s.toLowerCase().includes(q) || c.n.toLowerCase().includes(q) || (c.k || '').toLowerCase().includes(q) || (c.usd || '').toLowerCase().includes(q);
+function applyOrder(keepScroll) {
+  const q = state.q.trim().toLowerCase();
+  let list = [...ROWS.values()];
+  if (q) list = list.filter((r) => matchQ(r.c, q));
+  if (state.ex.length) list = list.filter((r) => state.ex.every((x) => r.c.x.includes(x)));
+  const byRank = (a, b) => a.c.r - b.c.r;
+  if (state.sort === 'score') list.sort((a, b) => b.score - a.score || byRank(a, b));
+  else if (state.sort === 'new13') list.sort((a, b) => (b.n13 ? b.n13.key : -1) - (a.n13 ? a.n13.key : -1) || byRank(a, b));
+  else list.sort(byRank);
+  VT.list = list; ORDER = list.map((r) => r.c.slug);
+  $('scr').setAttribute('aria-rowcount', String(list.length + 1));
+  const tb = $('scrBody');
+  if (!list.length) {
+    VT.first = 0; VT.last = -1;
+    const tr = el('tr', 'empty-row'), td = el('td', 'empty'); td.colSpan = NCOL;
+    td.append(el('p', null, q ? `검색어 "${state.q}"${state.ex.length ? '와 거래소 필터' : ''}에 맞는 종목이 없습니다.` : '거래소 필터에 맞는 종목이 없습니다.'));
+    const b = el('button', 'btn', '검색어와 필터 지우기'); b.type = 'button';
+    b.addEventListener('click', () => { state.q = ''; state.ex = []; $('q').value = ''; save(); renderScreener(false); $('q').focus(); });
+    td.append(b); tr.append(td); tb.replaceChildren(tr);
+  } else {
+    if (!keepScroll) $('tblw').scrollTop = 0;
+    if (!FOCUS.slug || !ORDER.includes(FOCUS.slug)) moveTabStop(ORDER[0], 0);
+    renderSlice(true);
+  }
+  const signals = list.filter((r) => r.score > 0).length;
+  const filt = [q && `검색 "${state.q}"`, state.ex.length && `${state.ex.map((x) => EX_NAME[x]).join('·')}${state.ex.length > 1 ? ' 모두' : ''} 상장`].filter(Boolean);
+  $('scrHint').textContent = `${list.length}종 표시 · 전체 ${COINS.length}종${filt.length ? ' · ' + filt.join(', ') : ''} · 점수가 0보다 큰 종목 ${signals}종 · ` +
+    '칸에 마우스를 올리거나 방향키로 옮기면 자세한 내용이 나옵니다. 줄을 누르면 종목 상세가 열립니다.';
+}
+function syncScreenerControls() {
+  const pressed = (sel, fn) => document.querySelectorAll(sel).forEach((b) => b.setAttribute('aria-pressed', String(fn(b.dataset))));
+  pressed('#sideSeg button', (d) => d.side === state.side);
+  pressed('#famSeg button', (d) => state.fam.includes(Number(d.fam)));
+  pressed('#nineSeg button', (d) => (d.nines === '1') === state.nines);
+  pressed('#winSeg button', (d) => Number(d.win) === state.win);
+  pressed('#exSeg button', (d) => state.ex.includes(d.ex));
+  pressed('#sortSeg button', (d) => d.sort === state.sort);
+  pressed('#scrHead .th-sort', (d) => d.sort === state.sort);
+  document.querySelectorAll('#scrHead th').forEach((th) => { const b = th.querySelector('.th-sort'); if (b) th.setAttribute('aria-sort', b.dataset.sort === state.sort ? (state.sort === 'mcap' ? 'ascending' : 'descending') : 'none'); });
+}
+function renderScreener(rescoreToo = true, keepScroll = false) {
+  hideTip();
+  syncScreenerControls();
+  if (rescoreToo) rescore();
+  applyOrder(keepScroll);
+  renderLegend();
+}
+function renderLegend() {
+  const both = state.side === 'both', lg = $('legend'); lg.replaceChildren();
+  const add = (nodes, text) => { const s = el('span'); s.append(...nodes, document.createTextNode(text)); lg.append(s); };
+  const f0 = FAMS.find((f) => state.fam.includes(f)) ?? FAMS[0];
+  add([chipEl('C', '13', f0)], '13 완성(계열 색)');
+  if (state.nines) add([chipEl('S', '9', null)], '셋업 9');
+  if (FAM_SEL[0]) add([chipEl('I', '+13', 0)], '13이 미뤄진 봉');
+  { const a = el('i', 'ago', '2'); add([chipEl('S', '9', null), a], ' 작은 숫자는 몇 봉 전인지'); }
+  { const p = el('span', 'pg', '12'); p.style.color = `var(--f${f0})`; add([p], '진행 중인 카운트다운'); }
+  if (state.nines) add([el('span', 'pg su', '7')], '셋업 카운트');
+  { const d = el('i', 'tgd'); d.style.setProperty('--c', `var(--f${f0})`); const d2 = el('i', 'tgd on'); d2.style.setProperty('--c', `var(--f${f0})`); add([d, d2], '다음 봉 조건 있음 / 지금 값으로 충족'); }
+  if (both) add([], '한 칸의 위는 매도 ▲, 아래는 매수 ▼');
+}
+function renderScoreHelp() {
+  const w = (tf) => WEIGHT[TFS.indexOf(tf)].toFixed(1);
+  $('scoreHelpBody').innerHTML = `<p style="margin:0 0 6px">칸에는 고른 기간 안에서 가장 강한 신호 하나를 씁니다. 차트처럼 매도 신호는 위, 매수 신호는 아래에 둡니다. 신호가 없으면 진행 중인 카운트다운(10 이상)이나 셋업 카운트(7 이상)를 흐리게 씁니다. +13은 13번째 카운트의 저가(매도는 고가)가 8번째 카운트 봉의 종가를 넘지 못해서 13이 다음 봉으로 미뤄진 봉입니다.</p>
+  <p style="margin:0">점수는 첫 버전의 대략적인 순서입니다. 타임프레임마다 가중치 × (신호 값 × 신선도의 합 + 다음 봉 조건 점수)를 구해서 모두 더합니다.</p>
+  <ul>
+    <li>가중치는 1 + log2(봉 하나의 일수)입니다. 1D ${w('1D')}, 1W ${w('1W')}, 2W ${w('2W')}, 1M ${w('1M')}, 3M ${w('3M')}, 12M ${w('12M')}입니다.</li>
+    <li>신호 값: 13은 3입니다. 13x2처럼 시작 봉이 여럿이면 하나 늘 때마다 1을 더하고, 13r이면 0.5를 더합니다. 9*는 1.5, 9는 1, 반복 9는 0.5, +13은 0.5입니다.</li>
+    <li>신선도는 1 / (1 + 몇 봉 전)입니다. 9는 3봉 전까지, 13과 +13은 12봉 전까지만 셉니다.</li>
+    <li>다음 봉에 13이 나올 조건이 있으면 그 계열마다 1.5를, 9가 나올 조건이 있으면 0.5를 더합니다. 조건이 지금 값으로 충족되는지는 따지지 않습니다.</li>
+    <li>켠 계열과 9 설정만 셉니다. 양쪽을 볼 때는 두 쪽 중 큰 점수로 정렬합니다. 표시 기간 설정은 점수에 영향을 주지 않습니다.</li>
+    <li>최근 13 열은 타임프레임마다 가장 최근의 13, 또는 최근 13봉 안의 13 가운데 마감이 가장 늦은 것입니다.</li>
+  </ul>` + (HAS_TG ? '' : '<p class="hint" style="margin:6px 0 0">이 빌드에는 다음 봉 조건이 아직 없어서, 조건 점과 조건 점수는 나오지 않습니다.</p>');
+}
+// tooltip of one table cell
+function tipForCell(r, col) {
+  const c = r.c, out = [];
+  if (col === 0) {
+    out.push(el('div', 'h1', `${c.r}위 · ${c.s}`), el('div', null, c.k ? `${c.k} · ${c.n}` : c.n), el('div', 'm', `시가총액 ${fmtCap(c.mc)} · ${exNames(c)}`));
+    out.push(el('div', 'm', c.usd ? `${c.usd}${c.li != null ? ` · 첫 일봉 ${iso(c.li)}` : ''}` : 'TradingView USD 티커 없음'));
+    return out;
+  }
+  if (col === 1) {
+    out.push(el('div', 'h1', `${c.s} · 점수`));
+    if (!c.t) { out.push(el('div', 'm', '데이터가 없습니다.')); return out; }
+    for (const d of sideDirs()) {
+      const parts = []; const v = sideScore(c, d, parts); parts.sort((a, b) => b[1] - a[1]);
+      const sec = el('div', 'sec'); sec.append(el('b', null, `${SIDE[d]} ${ARROW[d]} ${fmtScore(v)}`));
+      if (!parts.length) sec.append(muted('점수가 되는 신호가 없습니다.'));
+      for (const [j, x] of parts.slice(0, 6)) sec.append(tipRow(el('b', 'num', TFS[j]), muted(`${fmtScore(x)} (가중치 ${WEIGHT[j].toFixed(2)})`)));
+      if (parts.length > 6) sec.append(muted(`외 ${parts.length - 6}개 타임프레임`));
+      out.push(sec);
+    }
+    return out;
+  }
+  if (col === NCOL - 1) {
+    out.push(el('div', 'h1', `${c.s} · 최근 13`));
+    const n = r.n13;
+    if (!n) { out.push(el('div', 'm', c.t ? '켠 계열과 방향에서 찾은 13이 없습니다.' : '데이터가 없습니다.')); return out; }
+    out.push(tipRow(chipEl('C', n.text, n.f), `${SIDE[n.dir]} ${ARROW[n.dir]} · ${FAM_NAME[n.f]} · ${TFS[n.j]}`));
+    out.push(el('div', 'm', `${agoText(n.ago)} · ${n.exact ? `봉 ${iso(n.s)} ~ ${iso(n.e)}` : '이 종목은 TradingView 봉이 없는 날이 있어서 날짜는 종목 상세에서 확인하세요.'}`));
+    return out;
+  }
+  const j = col - 2, T = c.t && c.t[j], tf = TFS[j];
+  out.push(el('div', 'h1', `${c.s} · ${tf}`));
+  if (!T) { out.push(el('div', 'm', c.t ? `${tf} 확정 봉이 아직 없습니다.` : '데이터가 없습니다.')); return out; }
+  out.push(el('div', 'm', `마지막 확정 봉 ${iso(T.ls)}${T.le !== T.ls ? ` ~ ${iso(T.le)}` : ''} · 확정 봉 ${nf(T.n)}개`));
+  if (T.ps != null) {
+    let s = `진행 중인 봉 ${iso(T.ps)} 시작${T.pl != null ? `, ${iso(T.pl)}까지 반영` : ''}`;
+    if (Array.isArray(T.po)) s += ` · 시 ${fmtPrice(T.po[0])} 고 ${fmtPrice(T.po[1])} 저 ${fmtPrice(T.po[2])} 종 ${fmtPrice(T.po[3])}`;
+    out.push(el('div', 'm', s));
+  }
+  const win = { 0: '마지막 봉', 3: '최근 4봉', 12: '최근 13봉' }[state.win];
+  for (const d of sideDirs()) {
+    const x = cellInfo(c, j, d), sec = el('div', 'sec');
+    sec.append(el('b', null, `${SIDE[d]} ${ARROW[d]}`));
+    if (!x.labels.length) sec.append(muted(`${win} 안에 켠 신호가 없습니다.`));
+    for (const L of x.labels.slice().sort((a, b) => a.ago - b.ago)) {
+      const b = agoBar(c, j, L.ago);
+      const what = L.kind === 'C' ? `${FAM_NAME[L.f]} 13 완성` : L.kind === 'S' ? (L.rep ? '반복 9' : L.text === '9*' ? '셋업 9 (퍼펙트)' : '셋업 9') : `${FAM_NAME[L.f]} 13 미뤄짐`;
+      sec.append(tipRow(chipEl(L.kind, L.text, L.f), what, muted(`${agoText(L.ago)}${b.exact ? ' · ' + iso(b.s) : ''}`)));
+    }
+    const runs = [];
+    for (const f of FAMS) if (FAM_SEL[f]) { const s = (f * 2 + (d === SELL ? 1 : 0)) * 2; if (T.ru[s]) runs.push(`${FAM_NAME[f]} ${T.ru[s]}개 진행, 최고 ${T.ru[s + 1]}`); }
+    sec.append(muted(runs.length ? `카운트다운: ${runs.join(' · ')}` : '진행 중인 카운트다운 없음'));
+    sec.append(muted(`셋업 카운트 ${d === BUY ? T.br : T.sr}`));
+    if (x.trig) for (const t of x.trig.list) {
+      const live = Array.isArray(T.po) ? evalTg(t, poBar(T.po)) : null;
+      sec.append(el('div', null, '다음 봉: ' + trigText(t) + (live == null ? '' : live ? ' (지금까지의 값으로 충족)' : ' (지금까지의 값으로는 아직 아님)')));
+    }
+    out.push(sec);
+  }
+  out.push(el('div', 'foot', '누르거나 Enter를 치면 이 타임프레임으로 종목 상세가 열립니다.'));
+  return out;
+}
+function cellFromEvent(e) { const td = e.target.closest && e.target.closest('#scrBody td'); if (!td || !td.parentElement.dataset.s) return null; return { td, r: ROWS.get(td.parentElement.dataset.s), col: td.cellIndex }; }
+function openFromCell(r, col) {
+  if (col >= 2 && col < NCOL - 1) { state.tf = TFS[col - 2]; save(); }
+  else if (col === NCOL - 1 && r.n13) { state.tf = TFS[r.n13.j]; save(); }
+  location.hash = 'coin-' + r.c.slug;
+}
+function focusCell(slug, col) {
+  const i = ORDER.indexOf(slug); if (i < 0) return;
+  // bring the row into the scroll box (below the sticky header) and into the table, then focus the cell
+  const box = $('tblw'), per = VT.rowH, top = i * per, vis = box.clientHeight - theadH();
+  if (top < box.scrollTop) box.scrollTop = top; else if (top + per > box.scrollTop + vis) box.scrollTop = top + per - vis;
+  renderSlice(false);
+  moveTabStop(slug, col);
+  const td = ROWS.get(slug).td[col]; td.focus({ preventScroll: true });
+  td.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+}
+function wireScreener() {
+  const tb = $('scrBody');
+  tb.addEventListener('pointermove', (e) => {
+    if (e.pointerType === 'touch') return;
+    const x = cellFromEvent(e); if (!x) { hideTip(); return; }
+    const key = x.r.c.slug + ':' + x.col;
+    if (TIP_KEY !== key) { TIP_KEY = key; tip.replaceChildren(...tipForCell(x.r, x.col)); }
+    placeTip(e.clientX, e.clientY);
+  });
+  tb.addEventListener('pointerleave', hideTip);
+  tb.addEventListener('click', (e) => {
+    if (e.target.closest('a, button')) return;
+    const x = cellFromEvent(e); if (x) openFromCell(x.r, x.col);
+  });
+  tb.addEventListener('focusin', (e) => {
+    const x = cellFromEvent(e); if (!x) return;
+    if (x.r.c.slug !== FOCUS.slug || x.col !== FOCUS.col) moveTabStop(x.r.c.slug, x.col);
+    if (!x.td.matches(':focus-visible')) return;
+    const rc = x.td.getBoundingClientRect(); TIP_KEY = x.r.c.slug + ':' + x.col;
+    showTip(rc.right - 6, rc.bottom - 4, tipForCell(x.r, x.col));
+  });
+  tb.addEventListener('focusout', hideTip);
+  tb.addEventListener('keydown', (e) => {
+    const x = cellFromEvent(e); if (!x || e.altKey || e.metaKey) return;
+    const i = ORDER.indexOf(x.r.c.slug); let ns = x.r.c.slug, nc = x.col;
+    switch (e.key) {
+      case 'ArrowRight': nc = Math.min(NCOL - 1, x.col + 1); break;
+      case 'ArrowLeft': nc = Math.max(0, x.col - 1); break;
+      case 'ArrowDown': ns = ORDER[Math.min(ORDER.length - 1, i + 1)]; break;
+      case 'ArrowUp': ns = ORDER[Math.max(0, i - 1)]; break;
+      case 'PageDown': ns = ORDER[Math.min(ORDER.length - 1, i + 10)]; break;
+      case 'PageUp': ns = ORDER[Math.max(0, i - 10)]; break;
+      case 'Home': if (e.ctrlKey) ns = ORDER[0]; nc = 0; break;
+      case 'End': if (e.ctrlKey) ns = ORDER[ORDER.length - 1]; nc = NCOL - 1; break;
+      case 'Enter': case ' ': e.preventDefault(); openFromCell(x.r, x.col); return;
+      default: return;
+    }
+    e.preventDefault(); focusCell(ns, nc);
+  });
+  $('tblw').addEventListener('scroll', () => {
+    if (!$('scrBody').contains(document.activeElement)) hideTip();
+    if (!VT.raf) VT.raf = requestAnimationFrame(() => { VT.raf = 0; renderSlice(false); });
+  }, { passive: true });
+  // header sort buttons
+  $('scrHead').addEventListener('click', (e) => { const b = e.target.closest('.th-sort'); if (!b) return; state.sort = b.dataset.sort; save(); renderScreener(false); b.focus(); });
+  let qt; $('q').addEventListener('input', (e) => { clearTimeout(qt); qt = setTimeout(() => { state.q = e.target.value; renderScreener(false); }, 120); });
+}
+
+// ====================================================================================================
+// breadth board
+// ====================================================================================================
+const staleError = (msg) => Object.assign(new Error(msg), { stale: true });
+let BOARD_P = null, BOARD = null;
+function loadBoard() {
+  if (!BOARD_P) {
+    BOARD_P = fetch(`b.json?v=${encodeURIComponent(DATA.build)}`)
+      .then((r) => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); })
+      .then((j) => { if (j.build !== DATA.build) throw staleError(`빌드 ${j.build}`); BOARD = j; return j; });
+    BOARD_P.catch(() => { BOARD_P = null; });
+  }
+  return BOARD_P;
+}
+// b.json row: [day, coins, b9, s9, b9r, s9r, b13 S, AS, C, AC, s13 S, AS, C, AC]
+const B13 = (r, d) => (d === SELL ? r[10] + r[11] + r[12] + r[13] : r[6] + r[7] + r[8] + r[9]);
+const B13F = (r, d, f) => r[(d === SELL ? 10 : 6) + f];
+let MTX_PICK = null;
+function boardFail(err) {
+  const msg = err.stale ? '이 화면을 연 뒤에 새 데이터가 배포되었습니다. 새로고침하면 최신 데이터로 다시 엽니다.' : `폭 데이터를 불러오지 못했습니다 (${err.message}).`;
+  const b = el('button', 'btn', err.stale ? '새로고침' : '다시 시도'); b.type = 'button'; b.onclick = () => (err.stale ? location.reload() : renderBoard());
+  const p = el('div', 'empty'); p.append(el('p', null, msg), b);
+  $('mtx').replaceChildren(); $('mtxPick').replaceChildren(p);
+}
+function renderBoard() {
+  hideTip();
+  const btfSeg = $('btfSeg');
+  if (!btfSeg.children.length) btfSeg.innerHTML = TFS.map((tf) => `<button type="button" data-btf="${tf}">${tf}</button>`).join('');
+  document.querySelectorAll('#btfSeg button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.btf === state.btf)));
+  document.querySelectorAll('#brSeg button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.br === state.br)));
+  document.querySelectorAll('#bmSeg button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.bm === state.bm)));
+  document.querySelectorAll('#bnSeg button').forEach((b) => b.setAttribute('aria-pressed', String((b.dataset.bn === '1') === state.bn)));
+  if (!BOARD) {
+    $('mtxPick').replaceChildren(el('div', 'loading', '폭 데이터를 불러오는 중입니다…'));
+    loadBoard().then(() => { if (state.screen === 'board') renderBoard(); }, (err) => { if (state.screen === 'board') boardFail(err); });
+    return;
+  }
+  renderMatrix();
+  drawBreadth();
+}
+// The newest confirmed bar of every timeframe: buy / sell 9 and 13 counts. Wide screens put the timeframes in
+// columns; a narrow screen puts them in rows, so the table fits without scrolling sideways.
+function renderMatrix() {
+  const S = BOARD.series, last = TFS.map((tf) => { const s = S[tf]; return s && s.length ? s[s.length - 1] : null; });
+  const tbl = $('mtx'), narrow = tbl.parentElement.clientWidth < 900; tbl.replaceChildren(); tbl.classList.toggle('tr', narrow);
+  const metrics = [['매도 13', SELL, 'C', '매도 13'], ['매도 9', SELL, 'S', '매도 9'], ['봉이 있는 종목', 0, 'N', '종목'], ['매수 9', BUY, 'S', '매수 9'], ['매수 13', BUY, 'C', '매수 13']];
+  const tfHead = (j, cls) => {
+    const tf = TFS[j], th = el('th', cls), b = el('button'); b.type = 'button'; b.dataset.btf = tf; b.setAttribute('aria-pressed', String(state.btf === tf));
+    b.append(el('b', null, tf), el('span', null, last[j] ? iso(last[j][0]).slice(2) : '–')); b.title = last[j] ? `${tf} 가장 최근 확정 봉: ${iso(last[j][0])} 시작` : '';
+    if (cls) th.scope = 'row'; th.append(b); return th;
+  };
+  const cell = (j, [label, d, k]) => {
+    const r = last[j], td = el('td'), tf = TFS[j];
+    if (!r) { td.className = 'cnt'; td.textContent = '–'; return td; }
+    if (k === 'N') { td.className = 'cnt'; td.textContent = String(r[1]); return td; }
+    const hits = newestHits(j, r[0], d, k), v = hits.length, share = r[1] ? v / r[1] : 0;
+    const b = el('button', v ? '' : 'z', String(v)); b.type = 'button';
+    b.dataset.mj = j; b.dataset.md = d; b.dataset.mk = k;
+    b.setAttribute('aria-pressed', String(!!MTX_PICK && MTX_PICK.j === j && MTX_PICK.d === d && MTX_PICK.k === k));
+    b.setAttribute('aria-label', `${tf} ${label} ${v}종 (${pctText(v, r[1])})`);
+    b.title = `${tf} ${iso(r[0])} 시작 봉 · ${label} ${v}종 · 봉이 있는 종목의 ${pctText(v, r[1])}`;
+    if (v) {
+      const col = k === 'C' ? FAM_COLOR[[0, 1, 2, 3].sort((a, b2) => B13F(r, d, b2) - B13F(r, d, a) || a - b2)[0]] : SETUP_COLOR;
+      b.style.background = `color-mix(in srgb, ${col} ${Math.round(Math.min(1, share / 0.15) * 55 + 8)}%, var(--surface))`;
+    } else b.disabled = true;
+    td.append(b); return td;
+  };
+  const thead = el('thead'), hr = el('tr'), tb = el('tbody');
+  if (!narrow) {
+    hr.append(el('th', 'corner'));
+    TFS.forEach((_, j) => hr.append(tfHead(j)));
+    for (const m of metrics) { const tr = el('tr'), th = el('th', 'rh', m[0]); th.scope = 'row'; tr.append(th); TFS.forEach((_, j) => tr.append(cell(j, m))); tb.append(tr); }
+  } else {
+    hr.append(el('th', 'rh', 'TF'));
+    for (const m of metrics) hr.append(el('th', null, m[3]));
+    TFS.forEach((_, j) => { const tr = el('tr'); tr.append(tfHead(j, 'rh')); for (const m of metrics) tr.append(cell(j, m)); tb.append(tr); });
+  }
+  thead.append(hr); tbl.append(thead, tb);
+  renderMatrixPick();
+}
+// The coins with a 9 (k 'S', new or repeated) or a 13 (k 'C') of side d on the newest confirmed bar of timeframe j
+// (start day `day`), each coin once with its labels there: one coin can complete the 13s of two families on one bar,
+// so the matrix counts coins here rather than adding up the per-family counts of b.json.
+const NEWEST = new Map();
+function newestHits(j, day, d, k) {
+  const key = `${j}|${day}|${d}|${k}`;
+  let hits = NEWEST.get(key);
+  if (!hits) {
+    hits = [];
+    for (const c of COINS) {
+      const T = c.t && c.t[j]; if (!T || T.ls !== day) continue;
+      const labels = T.rl.filter((L) => L[0] === 0 && L[2] === d && L[1] === k && (k === 'C' || L[4].startsWith('9')));
+      if (labels.length) hits.push({ c, labels });
+    }
+    hits.sort((a, b) => a.c.r - b.c.r);
+    NEWEST.set(key, hits);
+  }
+  return hits;
+}
+function renderMatrixPick() {
+  const box = $('mtxPick'); box.replaceChildren();
+  if (!MTX_PICK) { box.append(el('p', 'hint', '표의 숫자를 누르면 그 봉에서 신호가 나온 종목을 보여 줍니다.')); return; }
+  const { j, d, k } = MTX_PICK, tf = TFS[j], S = BOARD.series[tf], r = S[S.length - 1], day = r[0];
+  const hits = newestHits(j, day, d, k);
+  box.append(el('div', null, `${tf} · ${iso(day)} 시작 봉 · ${SIDE[d]} ${k === 'C' ? '13' : '9'} · ${hits.length}종`));
+  const list = el('div', 'list');
+  for (const { c, labels } of hits) {
+    const a = el('a'); a.href = '#coin-' + c.slug; a.addEventListener('click', () => { state.tf = tf; save(); });
+    for (const L of labels) a.append(chipEl(L[1], L[4], L[3]));
+    a.append(document.createTextNode(c.s));
+    a.title = `${c.r}위 ${nameOf(c)}` + (k === 'C' ? ' · ' + labels.map((L) => `${FAM_NAME[L[3]]} ${L[4]}`).join(', ') : labels.some(repeated9) ? ' · 반복 9' : '');
+    list.append(a);
+  }
+  box.append(list);
+}
+function drawBreadth() {
+  const tf = state.btf, S = BOARD.series[tf] || [];
+  const from = state.br === 'all' ? -Infinity : LAST - Math.round(Number(state.br) * 365.25);
+  const rows = S.filter((r) => r[0] >= from);
+  const cv = $('breadth'), W = cv.parentElement.clientWidth, H = innerWidth < 720 ? 240 : 300;
+  const ctx = setupCanvas(cv, W, H);
+  const pct = state.bm === 'p', nines = state.bn;
+  const padL = 44, padR = 8, padT = 10, padB = 20, plotW = W - padL - padR, plotH = H - padT - padB;
+  const MINC = 20; // percent mode: bars with fewer coins are faded
+  const val = (r, v) => (pct ? (r[1] ? v / r[1] * 100 : 0) : v);
+  const stack = (r, d) => { const out = []; for (const f of [0, 1, 2, 3]) out.push([FAM_COLOR[f], val(r, B13F(r, d, f))]); if (nines) { out.push([SETUP_COLOR, val(r, d === SELL ? r[3] : r[2])]); out.push(['rep', val(r, d === SELL ? r[5] : r[4])]); } return out; };
+  const tot = (r, d) => stack(r, d).reduce((s, x) => s + x[1], 0);
+  let maxUp = 1, maxDn = 1; for (const r of rows) { maxUp = Math.max(maxUp, tot(r, SELL)); maxDn = Math.max(maxDn, tot(r, BUY)); }
+  const sc = plotH / (maxUp + maxDn), mid = padT + maxUp * sc, N = rows.length;
+  const repCol = `color-mix(in srgb, ${SETUP_COLOR} 45%, ${C.surface})`;
+  ctx.strokeStyle = C.line; ctx.beginPath(); ctx.moveTo(padL, Math.round(mid) + 0.5); ctx.lineTo(W - padR, Math.round(mid) + 0.5); ctx.stroke();
+  // one column per pixel when bars are thinner than a pixel: the bar with the largest total on each side
+  const cols = Math.min(N, Math.floor(plotW)), bw = plotW / Math.max(1, cols);
+  for (let ci = 0; ci < cols; ci++) {
+    const k0 = Math.floor(ci * N / cols), k1 = Math.max(k0, Math.floor((ci + 1) * N / cols) - 1);
+    for (const d of [SELL, BUY]) {
+      let best = null, bt = -1; for (let k = k0; k <= k1; k++) { const t = tot(rows[k], d); if (t > bt) { bt = t; best = rows[k]; } }
+      if (!best || bt <= 0) continue;
+      ctx.globalAlpha = pct && best[1] < MINC ? 0.35 : 1;
+      let acc = 0; const x = padL + ci * bw, w = Math.max(1, bw - (bw > 3 ? 1 : 0));
+      for (const [col, v] of stack(best, d)) {
+        if (!v) continue; ctx.fillStyle = col === 'rep' ? repCol : col;
+        const h = v * sc; if (d === SELL) ctx.fillRect(x, mid - acc - h, w, h); else ctx.fillRect(x, mid + acc, w, h); acc += h;
+      }
+    }
+  }
+  ctx.globalAlpha = 1;
+  ctx.font = '10.5px "IBM Plex Mono", monospace'; ctx.fillStyle = C.muted; ctx.textAlign = 'right'; ctx.textBaseline = 'middle';
+  const unit = pct ? '%' : '';
+  ctx.fillText(fmtAxis(maxUp) + unit, padL - 6, padT + 5); ctx.fillText('0', padL - 6, mid); ctx.fillText(fmtAxis(maxDn) + unit, padL - 6, H - padB - 5);
+  ctx.textAlign = 'left'; ctx.font = '11px "IBM Plex Sans KR", sans-serif';
+  ctx.fillText('매도 ▲', padL + 4, padT + 6); ctx.fillText('매수 ▼', padL + 4, H - padB - 6);
+  // x axis
+  ctx.font = '10.5px "IBM Plex Mono", monospace'; ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic';
+  for (const t of dateTicks(rows.map((r) => r[0]), plotW)) ctx.fillText(t.label, padL + (t.i + 0.5) / N * plotW, H - 5);
+  // legend and hint
+  const lg = $('brLegend'); lg.replaceChildren();
+  for (const f of FAMS) { const s = el('span'); const i = el('i'); i.style.background = FAM_COLOR[f]; s.append(i, document.createTextNode(`13 ${FAM_NAME[f]}`)); lg.append(s); }
+  if (nines) { for (const [col, t] of [[SETUP_COLOR, '9'], [repCol, '반복 9']]) { const s = el('span'); const i = el('i'); i.style.background = col; s.append(i, document.createTextNode(t)); lg.append(s); } }
+  $('brTitle').textContent = `${tf} 봉별 ${nines ? '9·13' : '13'} 완성 ${pct ? '종목 비율' : '종목 수'}`;
+  $('brHint').textContent = `${rows.length ? `${iso(rows[0][0])}부터 ${iso(rows[N - 1][0])}까지 ${nf(N)}개 봉` : '봉 없음'}입니다. 위는 매도 쪽, 아래는 매수 쪽이고, 13은 계열 색으로 쌓고 9는 회색으로 쌓습니다. 9와 13, 그리고 계열이 다른 13은 따로 셉니다. 그래서 한 종목이 같은 봉에서 둘 이상을 함께 완성하면 막대에 그 수만큼 들어갑니다.` +
+    (pct ? ` 비율은 그 봉에 확정 봉이 있는 종목 수로 나눈 값입니다. 종목이 ${MINC}종 미만인 봉은 흐리게 그립니다.` : '') +
+    (cols < N ? ' 막대 하나가 여러 봉을 대표할 때는 합계가 가장 큰 봉을 그립니다.' : '') + ' 막대에 마우스를 올리면 숫자가 나옵니다.';
+  cv.onpointermove = cv.onpointerdown = (ev) => {
+    const rc = cv.getBoundingClientRect(), k = Math.floor((ev.clientX - rc.left - padL) / plotW * N);
+    if (k < 0 || k >= N) { hideTip(); return; }
+    const r = rows[k], a = bucketStarts(tf), bi = bucketIndex(a, r[0]), end = a[bi + 1] - 1, out = [];
+    out.push(el('div', 'h1', `${tf} · ${iso(r[0])}${end > r[0] ? ' ~ ' + iso(end) : ''}`), el('div', 'm', `확정 봉이 있는 종목 ${r[1]}종`));
+    for (const d of [SELL, BUY]) {
+      const sec = el('div', 'sec'); sec.append(el('b', null, `${SIDE[d]} ${ARROW[d]}`));
+      for (const f of FAMS) { const v = B13F(r, d, f); if (v) sec.append(tipRow(chipEl('C', '13', f), `${FAM_NAME[f]} ${v}종`, muted(pctText(v, r[1])))); }
+      const n9 = d === SELL ? r[3] : r[2], n9r = d === SELL ? r[5] : r[4];
+      if (n9) sec.append(tipRow(chipEl('S', '9', null), `셋업 9 ${n9}종`, muted(pctText(n9, r[1]))));
+      if (n9r) sec.append(tipRow(chipEl('S', '9', null), `반복 9 ${n9r}종`, muted(pctText(n9r, r[1]))));
+      if (!B13(r, d) && !n9 && !n9r) sec.append(muted('없음'));
+      out.push(sec);
+    }
+    showTip(ev.clientX, ev.clientY, out);
+  };
+  cv.onpointerleave = hideTip;
+}
+function fmtAxis(v) { return v >= 100 ? v.toFixed(0) : v >= 10 ? v.toFixed(0) : (Math.round(v * 10) / 10).toString(); }
+// tick labels for a list of bar start days placed by index: years, or quarters, or months, at least ~64px apart
+function dateTicks(days, px) {
+  const N = days.length; if (!N) return [];
+  const span = days[N - 1] - days[0], out = [];
+  const keyOf = span > 365 * 3 ? (d) => new Date(d * DAY).getUTCFullYear()
+    : span > 200 ? (d) => { const t = new Date(d * DAY); return t.getUTCFullYear() * 4 + Math.floor(t.getUTCMonth() / 3); }
+      : (d) => { const t = new Date(d * DAY); return t.getUTCFullYear() * 12 + t.getUTCMonth(); };
+  const label = span > 365 * 3 ? (d) => String(new Date(d * DAY).getUTCFullYear()) : (d) => iso(d).slice(0, 7);
+  let lastX = -Infinity;
+  for (let i = 1; i < N; i++) {
+    if (keyOf(days[i]) === keyOf(days[i - 1])) continue;
+    const x = (i + 0.5) / N * px; if (x - lastX < 64 || x < 24 || x > px - 24) continue;
+    out.push({ i, label: label(days[i]) }); lastX = x;
+  }
+  return out;
+}
+function setupCanvas(cv, w, h) {
+  const dpr = window.devicePixelRatio || 1;
+  cv.width = Math.max(1, Math.round(w * dpr)); cv.height = Math.max(1, Math.round(h * dpr)); cv.style.height = h + 'px';
+  const ctx = cv.getContext('2d'); ctx.setTransform(dpr, 0, 0, dpr, 0, 0); return ctx;
+}
+
+// ====================================================================================================
+// coin page
+// ====================================================================================================
+const CHUNKS = new Map();
+function loadChunk(ch) {
+  if (!CHUNKS.has(ch)) {
+    const p = fetch(`d/${ch}.json?v=${encodeURIComponent(DATA.build)}`)
+      .then((r) => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); })
+      .then((j) => { if (j.build !== DATA.build) throw staleError(`빌드 ${j.build}`); return j.daily; });
+    p.catch(() => CHUNKS.delete(ch));
+    CHUNKS.set(ch, p);
+    if (CHUNKS.size > 16) CHUNKS.delete(CHUNKS.keys().next().value);
+  }
+  return CHUNKS.get(ch);
+}
+// syminfo.mintick is not in the data: the smallest price step seen in the recent closes
+function estimateMintick(d) {
+  let dec = 0;
+  for (let i = d.c.length - 1, k = 0; i >= 0 && k < 400; i--) {
+    const v = d.c[i]; if (v == null) continue; k++;
+    const s = String(v), m = /e-(\d+)$/.exec(s), frac = (s.split('e')[0].split('.')[1] || '').length;
+    dec = Math.max(dec, m ? Number(m[1]) + frac : frac);
+  }
+  return Math.pow(10, -Math.min(dec, 12));
+}
+const DET = new Map();
+function detailFor(c, daily) {
+  if (DET.has(c.slug)) return DET.get(c.slug);
+  const d = daily && daily[c.usd]; if (!d) throw staleError(`${c.usd} 없음`);
+  const tfs = TFS.map((tf, j) => {
+    const bars = BARS.buildBars(d, tf, LAST);
+    const res = bars.n ? TD.runTD(bars, OPT) : null;
+    return { tf, j, bars, res, tg: undefined, pad: null, byBar: null };
+  });
+  const det = { c, d, mintick: estimateMintick(d), tfs };
+  DET.set(c.slug, det); if (DET.size > 6) DET.delete(DET.keys().next().value);
+  return det;
+}
+// next-bar triggers: the engine's, when this build has them, else the build's summary
+function trigsOf(det, j) {
+  const x = det.tfs[j]; if (x.tg !== undefined) return x.tg;
+  x.tg = null;
+  if (x.res && typeof TD.nextBarTriggers === 'function') {
+    try { x.tg = TD.nextBarTriggers(x.bars, x.res, OPT) || []; } catch (e) { x.tg = { error: String((e && e.message) || e) }; }
+  } else { const T = det.c.t && det.c.t[j]; if (T && Array.isArray(T.tg)) x.tg = T.tg; }
+  return x.tg;
+}
+// label pad as the script computes it: max(ATR14 (Wilder), mintick * 10) * spacing, high - low before ATR exists
+function padArray(bars, mintick) {
+  const n = bars.n, H = bars.h, L = bars.l, Cl = bars.c, out = new Float64Array(n);
+  let sum = 0, atr = NaN;
+  for (let i = 0; i < n; i++) {
+    const tr = i === 0 ? H[i] - L[i] : Math.max(H[i] - L[i], Math.abs(H[i] - Cl[i - 1]), Math.abs(L[i] - Cl[i - 1]));
+    if (i < 14) { sum += tr; if (i === 13) atr = sum / 14; } else atr = (atr * 13 + tr) / 14;
+    out[i] = Math.max(Number.isNaN(atr) ? H[i] - L[i] : atr, mintick * 10) * OPT.spacing;
+  }
+  return out;
+}
+// the price the script puts a label at (f_emitLabel y)
+function labelPrice(L, bars, pad) {
+  const i = L.bar, lo = bars.l[i], hi = bars.h[i], p = pad[i];
+  if (L.kind === 'S') return L.dir === BUY ? lo - p * 0.5 : hi + p * 0.5;
+  if (L.kind === 'C') { const base = L.dir === BUY ? lo : hi, safe = Math.min(p, Math.abs(base) * 0.06 / 8); return base + L.dir * safe * (2 + L.family * 2); }
+  if (L.kind === 'I') return (L.dir === BUY ? lo : hi) + L.dir * p * (1.5 + L.family * 1.5);
+  return L.dir === BUY ? lo - p : hi + p;
+}
+const labelColor = (L) => (L.kind === 'S' ? SETUP_COLOR : FAM_COLOR[L.family]);
+const LABEL_FONT = { large: '600 15px "IBM Plex Sans KR", sans-serif', small: '500 11px "IBM Plex Sans KR", sans-serif', tiny: '600 9.5px "IBM Plex Sans KR", sans-serif', normal: '500 12px "IBM Plex Sans KR", sans-serif' };
+function labelKindText(L, bars) {
+  if (L.kind === 'S') return L.raw > 9 ? `반복 9 (셋업 ${L.raw})` : L.text === '9*' ? '셋업 9 (퍼펙트)' : '셋업 9';
+  if (L.kind === 'C') return `13 완성${/r/.test(L.text) ? ' (r: 셋업 18 이상 뒤)' : ''}`;
+  if (L.kind === 'I') return L.text.startsWith('+') ? '13 미뤄짐' : '카운트';
+  return '취소';
+}
+let CUR = null; // { c, det }
+function coinBySlug(s) { return SLUG.get(String(s || '').toLowerCase()) || null; }
+function renderCoin() {
+  hideTip();
+  const c = coinBySlug(state.coin);
+  const title = $('dTitle'), meta = $('dMeta');
+  syncCoinControls(c);
+  if (!c) {
+    title.replaceChildren(el('h1', null, '종목을 찾을 수 없습니다'));
+    meta.replaceChildren(el('span', null, `"${state.coin}"는 목록에 없는 종목입니다. 스크리너에서 종목을 골라 주세요.`));
+    coinEmpty(''); return;
+  }
+  state.lastCoin = c.slug;
+  // a young coin has no bar yet on the long timeframes: show the longest one it has, up to the chosen one
+  if (c.t && !c.t[TFS.indexOf(state.tf)]) { let j = TFS.indexOf(state.tf); while (j > 0 && !c.t[j]) j--; state.tf = TFS[j]; syncCoinControls(c); }
+  title.replaceChildren(el('h1', null, c.s), el('span', 'nm', c.k ? `${c.k} · ${c.n}` : c.n));
+  meta.innerHTML = `<span>시가총액 ${c.r}위 ${esc(fmtCap(c.mc))}</span>${exChips(c, 'lg')}<span>${esc(exNames(c))}</span>${c.usd ? `<span class="num">${esc(c.usd)}</span>` : ''}${c.li != null ? `<span>첫 일봉 ${iso(c.li)}</span>` : ''}`;
+  // prev / next follow the screener's order
+  const seq = ORDER.includes(c.slug) ? ORDER : COINS.map((x) => x.slug), idx = seq.indexOf(c.slug);
+  $('prevCoin').disabled = idx <= 0; $('nextCoin').disabled = idx < 0 || idx >= seq.length - 1;
+  $('prevCoin').onclick = () => { if (idx > 0) location.hash = 'coin-' + seq[idx - 1]; };
+  $('nextCoin').onclick = () => { if (idx < seq.length - 1) location.hash = 'coin-' + seq[idx + 1]; };
+  $('navPos').textContent = `${idx + 1} / ${seq.length} · ${ORDER.includes(c.slug) ? '스크리너 순서' : '시가총액 순서'}`;
+  if (!c.usd) { coinEmpty('TradingView에서 이 종목의 USD 티커를 찾지 못해서 TD를 셀 수 없습니다.'); return; }
+  // a ticker whose fetch failed this run: the build has no bars for it, and its daily file holds none
+  if (!c.t) { coinEmpty(`이번 수집에서 ${c.usd}의 TradingView 데이터를 받지 못해서 TD를 셀 수 없습니다.`); return; }
+  const det = DET.get(c.slug);
+  if (!det) {
+    coinEmpty('일봉 데이터를 불러오는 중입니다…');
+    loadChunk(c.ch).then((daily) => detailFor(c, daily)).then(() => { if (state.screen === 'coin' && coinBySlug(state.coin) === c) renderCoin(); }, (err) => {
+      if (state.screen !== 'coin' || coinBySlug(state.coin) !== c) return;
+      const b = el('button', 'btn', err.stale ? '새로고침' : '다시 시도'); b.type = 'button'; b.onclick = () => (err.stale ? location.reload() : renderCoin());
+      const w = $('chartWait'); w.replaceChildren(el('p', null, err.stale ? '이 화면을 연 뒤에 새 데이터가 배포되었습니다. 새로고침하면 최신 데이터로 다시 엽니다.' : `일봉 데이터를 불러오지 못했습니다 (${err.message}).`), b);
+    });
+    return;
+  }
+  CUR = { c, det };
+  $('chartWait').hidden = true; $('chart').hidden = false;
+  const j = TFS.indexOf(state.tf);
+  chartOpen(det, j, false);
+  drawBarcode();
+  renderStateTable();
+  renderLabelList();
+}
+function coinEmpty(msg) {
+  CUR = null; CH.x = null;
+  const w = $('chartWait'); w.hidden = false; w.replaceChildren(document.createTextNode(msg)); $('chart').hidden = true;
+  $('readout').replaceChildren(); $('chartNote').replaceChildren();
+  setupCanvas($('bcode'), 10, 1); $('stateTbl').replaceChildren(); $('labelTbl').replaceChildren(); $('llMore').replaceChildren(); $('llHint').textContent = '';
+}
+function syncCoinControls(c) {
+  const seg = $('tfSeg');
+  if (!seg.children.length) seg.innerHTML = TFS.map((tf) => `<button type="button" data-tf="${tf}">${tf}</button>`).join('');
+  const j = TFS.indexOf(state.tf);
+  seg.querySelectorAll('button').forEach((b) => {
+    b.setAttribute('aria-pressed', String(b.dataset.tf === state.tf));
+    const T = c && c.t && c.t[TFS.indexOf(b.dataset.tf)]; b.disabled = !!(c && c.t) && !T;
+  });
+  document.querySelectorAll('#scaleSeg button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.scale === state.scale)));
+  document.querySelectorAll('#bcSeg button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.bc === state.bc)));
+  const a = $('tvLink');
+  if (c && c.usd) { a.hidden = false; a.href = tvUrl(c.usd, state.tf); a.textContent = `TradingView에서 ${state.tf} 차트 열기 ↗`; } else a.hidden = true;
+  $('llTitle').textContent = `라벨 목록 · ${TFS[j]}`;
+}
+function selectTf(tf, centerDay) {
+  if (!TFS.includes(tf)) return;
+  const same = tf === state.tf;
+  state.tf = tf; save();
+  syncCoinControls(CUR ? CUR.c : null);
+  if (!CUR) return;
+  if (!same) chartOpen(CUR.det, TFS.indexOf(tf), false);
+  if (centerDay != null) chartCenterOn(centerDay); else if (same) chartDraw();
+  drawBarcode(); renderStateTable(); renderLabelList();
+}
+
+// ---------- candle chart ----------
+const CH = { x: null, det: null, j: 0, n: 0, total: 0, i0: 0, i1: 150, hover: -1, hy: -1, drag: null, raf: 0, geo: null, sel: -1 };
+function chartOpen(det, j, keep) {
+  const x = det.tfs[j];
+  CH.det = det; CH.j = j; CH.x = x; CH.n = x.bars.n; CH.total = x.bars.n + (x.bars.partial ? 1 : 0); CH.hover = -1; CH.sel = -1;
+  if (!x.pad) x.pad = padArray(x.bars, det.mintick);
+  if (!x.byBar) { x.byBar = new Map(); if (x.res) x.res.labels.forEach((L, k) => { let a = x.byBar.get(L.bar); if (!a) x.byBar.set(L.bar, a = []); a.push(k); }); }
+  if (!keep) chartReset();
+  chartNote(); chartDraw(); readout(-1);
+}
+function chartReset() { const span = Math.min(154, Math.max(24, CH.total + 6)); CH.i1 = CH.total + 4; CH.i0 = CH.i1 - span; }
+function clampView() {
+  let span = CH.i1 - CH.i0; const maxSpan = Math.max(30, CH.total + 40);
+  if (span < 12) { const m = (CH.i0 + CH.i1) / 2; CH.i0 = m - 6; CH.i1 = m + 6; span = 12; }
+  if (span > maxSpan) { CH.i1 = CH.total + 8; CH.i0 = CH.i1 - maxSpan; span = maxSpan; }
+  if (CH.i1 > CH.total + span * 0.6) { CH.i1 = CH.total + span * 0.6; CH.i0 = CH.i1 - span; }
+  if (CH.i0 < -span * 0.6) { CH.i0 = -span * 0.6; CH.i1 = CH.i0 + span; }
+}
+function chartCenterOn(day) {
+  if (!CH.x) return;
+  const b = CH.x.bars; let i = 0; while (i < b.n - 1 && b.end[i] < day) i++;
+  const span = Math.min(CH.i1 - CH.i0, 154); CH.i0 = i + 0.5 - span / 2; CH.i1 = CH.i0 + span; CH.sel = i; clampView(); chartDraw(); readout(i);
+}
+const chartHeight = () => (innerWidth < 720 ? 330 : innerWidth < 1100 ? 400 : 470);
+function barAt(i) { const b = CH.x.bars; if (i < b.n) return { o: b.o[i], h: b.h[i], l: b.l[i], c: b.c[i], s: b.start[i], e: b.end[i], partial: false }; const p = b.partial; return { o: p.o, h: p.h, l: p.l, c: p.c, s: p.start, e: p.end, last: p.last, partial: true }; }
+function scheduleDraw() { if (!CH.raf) CH.raf = requestAnimationFrame(() => { CH.raf = 0; chartDraw(); }); }
+function niceStep(range, target) { const raw = range / Math.max(1, target), p = Math.pow(10, Math.floor(Math.log10(raw))), m = raw / p; return (m < 1.5 ? 1 : m < 3.5 ? 2 : m < 7.5 ? 5 : 10) * p; }
+function axisPrice(v, step) { const dec = Math.max(0, Math.min(12, -Math.floor(Math.log10(step)) + (step / Math.pow(10, Math.floor(Math.log10(step))) % 1 ? 1 : 0))); const s = v.toFixed(dec); const [i, f] = s.split('.'); return i.replace(/\B(?=(\d{3})+(?!\d))/g, ',') + (f ? '.' + f : ''); }
+function chartDraw() {
+  const cv = $('chart'); if (!CH.x || cv.hidden) return;
+  const W = cv.parentElement.clientWidth - 12, H = chartHeight();
+  const ctx = setupCanvas(cv, W, H);
+  const x = CH.x, b = x.bars, n = b.n, res = x.res;
+  ctx.fillStyle = C.surface; ctx.fillRect(0, 0, W, H);
+  if (!CH.total) { ctx.fillStyle = C.muted; ctx.font = '13px "IBM Plex Sans KR", sans-serif'; ctx.textAlign = 'center'; ctx.fillText('이 타임프레임에는 아직 봉이 없습니다.', W / 2, H / 2); return; }
+  const axisW = innerWidth < 720 ? 58 : 76, plotL = 0, plotR = W - axisW, plotT = 6, plotB = H - 22, plotW = plotR - plotL;
+  const span = CH.i1 - CH.i0, bw = plotW / span;
+  const a = Math.max(0, Math.floor(CH.i0)), z = Math.min(CH.total - 1, Math.ceil(CH.i1) - 1);
+  const X = (i) => plotL + (i + 0.5 - CH.i0) * bw;
+  // y range: visible bars and the labels on them
+  let lo = Infinity, hi = -Infinity;
+  for (let i = a; i <= z; i++) { const B = barAt(i); if (B.l < lo) lo = B.l; if (B.h > hi) hi = B.h; }
+  if (res) for (let i = a; i <= Math.min(z, n - 1); i++) { const ks = x.byBar.get(i); if (ks) for (const k of ks) { const p = labelPrice(res.labels[k], b, x.pad); if (p < lo && (state.scale !== 'log' || p > 0)) lo = p; if (p > hi) hi = p; } }
+  if (!(lo < Infinity)) { lo = 0; hi = 1; }
+  const log = state.scale === 'log' && lo > 0;
+  const f = log ? Math.log : (v) => v, fi = log ? Math.exp : (v) => v;
+  let fl = f(lo), fh = f(hi); if (!(fh > fl)) { const m = fl || 1; fl = m - Math.abs(m) * 0.01 - 1e-12; fh = m + Math.abs(m) * 0.01 + 1e-12; }
+  const mT = 30, mB = 30, ky = (plotB - plotT - mT - mB) / (fh - fl);
+  const Y = (p) => plotB - mB - (f(log ? Math.max(p, lo * 1e-3) : p) - fl) * ky;
+  const Pof = (y) => fi(fl + (plotB - mB - y) / ky);
+  CH.geo = { plotL, plotR, plotT, plotB, bw, X, Y, Pof, a, z, axisW, W, H };
+  // grid and price axis
+  ctx.font = '10.5px "IBM Plex Mono", monospace'; ctx.textBaseline = 'middle'; ctx.textAlign = 'left';
+  const pTop = Pof(plotT), pBot = Pof(plotB);
+  let ticks = [];
+  if (log) {
+    const l0 = Math.floor(Math.log10(pBot)), l1 = Math.ceil(Math.log10(pTop));
+    // 1-2-5 steps per decade; with many decades only the powers of ten (m = 1)
+    for (let e = l0; e <= l1; e++) for (const m of [1, 2, 5]) { const v = Number((m * Math.pow(10, e)).toPrecision(3)); if (v >= pBot && v <= pTop) ticks.push([v, 0, m]); }
+    if (ticks.length > 12) ticks = ticks.filter((t) => t[2] === 1);
+    if (ticks.length < 3) { const st = niceStep(pTop - pBot, 5); ticks = []; for (let v = Math.ceil(pBot / st) * st; v <= pTop; v += st) ticks.push([v, st]); }
+  } else { const st = niceStep(pTop - pBot, Math.max(3, Math.round((plotB - plotT) / 60))); for (let v = Math.ceil(pBot / st) * st; v <= pTop; v += st) ticks.push([v, st]); }
+  ctx.strokeStyle = C.line; ctx.lineWidth = 1; ctx.fillStyle = C.muted;
+  for (const [v, st] of ticks) { const y = Math.round(Y(v)) + 0.5; if (y < plotT || y > plotB) continue; ctx.beginPath(); ctx.moveTo(plotL, y); ctx.lineTo(plotR, y); ctx.stroke(); ctx.fillText(st ? axisPrice(v, st) : fmtPrice(v), plotR + 6, y); }
+  // time axis
+  const days = []; for (let i = a; i <= z; i++) days.push(barAt(i).s);
+  ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic';
+  for (const t of dateTicks(days, (z - a + 1) * bw)) { const xx = X(a + t.i); if (xx < 20 || xx > plotR - 20) continue; ctx.fillStyle = C.line; ctx.fillRect(Math.round(xx), plotT, 1, plotB - plotT); ctx.fillStyle = C.muted; ctx.fillText(t.label, xx, H - 6); }
+  ctx.save(); ctx.beginPath(); ctx.rect(plotL, plotT, plotW, plotB - plotT); ctx.clip();
+  // candles
+  const body = Math.max(1, Math.min(bw * 0.72, bw - 1));
+  for (let i = a; i <= z; i++) {
+    const B = barAt(i), up = B.c >= B.o, col = up ? C.up : C.down, cx = X(i);
+    ctx.fillStyle = col; ctx.strokeStyle = col;
+    const yh = Y(B.h), yl = Y(B.l);
+    ctx.fillRect(Math.round(cx - 0.5), Math.round(yh), 1, Math.max(1, Math.round(yl - yh)));
+    if (bw >= 2.5) {
+      const y0 = Y(Math.max(B.o, B.c)), y1 = Y(Math.min(B.o, B.c)), hgt = Math.max(1, y1 - y0);
+      if (B.partial) { ctx.fillStyle = C.surface; ctx.fillRect(cx - body / 2, y0, body, hgt); ctx.lineWidth = 1; ctx.strokeRect(Math.round(cx - body / 2) + 0.5, Math.round(y0) + 0.5, Math.max(1, Math.round(body) - 1), Math.max(1, Math.round(hgt) - 1)); }
+      else ctx.fillRect(cx - body / 2, y0, body, hgt);
+    }
+  }
+  // labels: text only, buy under the bar (label_up), sell above it (label_down)
+  if (res) {
+    ctx.textAlign = 'center'; ctx.lineJoin = 'round';
+    const vis = res.chartVisibleFrom;
+    for (let i = a; i <= Math.min(z, n - 1); i++) {
+      const ks = x.byBar.get(i); if (!ks) continue;
+      for (const k of ks) {
+        const L = res.labels[k]; let py = Y(labelPrice(L, b, x.pad));
+        ctx.font = LABEL_FONT[L.size] || LABEL_FONT.normal;
+        if (L.dir === BUY) { ctx.textBaseline = 'top'; py += 4; } else { ctx.textBaseline = 'bottom'; py -= 4; }
+        ctx.globalAlpha = k < vis ? 0.3 : 1;
+        ctx.lineWidth = 3; ctx.strokeStyle = C.surface; ctx.strokeText(L.text, X(i), py);
+        ctx.fillStyle = labelColor(L); ctx.fillText(L.text, X(i), py);
+      }
+    }
+    ctx.globalAlpha = 1;
+  }
+  ctx.restore();
+  // axis border
+  ctx.fillStyle = C.line; ctx.fillRect(plotR, plotT, 1, plotB - plotT); ctx.fillRect(plotL, plotB, plotW, 1);
+  // crosshair
+  const hv = CH.hover >= 0 ? CH.hover : CH.sel;
+  if (hv >= a && hv <= z) {
+    const cx = Math.round(X(hv)) + 0.5;
+    ctx.strokeStyle = C.muted; ctx.setLineDash([3, 3]); ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(cx, plotT); ctx.lineTo(cx, plotB); ctx.stroke();
+    if (CH.hover >= 0 && CH.hy >= plotT && CH.hy <= plotB) { ctx.beginPath(); ctx.moveTo(plotL, Math.round(CH.hy) + 0.5); ctx.lineTo(plotR, Math.round(CH.hy) + 0.5); ctx.stroke(); }
+    ctx.setLineDash([]);
+    const B = barAt(hv), dl = iso(B.s);
+    ctx.font = '10.5px "IBM Plex Mono", monospace'; const tw = ctx.measureText(dl).width + 10;
+    ctx.fillStyle = C.fg; ctx.fillRect(Math.max(0, Math.min(plotR - tw, cx - tw / 2)), plotB + 2, tw, 17);
+    ctx.fillStyle = C.surface; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(dl, Math.max(tw / 2, Math.min(plotR - tw / 2, cx)), plotB + 11);
+    if (CH.hover >= 0 && CH.hy >= plotT && CH.hy <= plotB) {
+      const pl = fmtPrice(Number(Pof(CH.hy).toPrecision(6)));
+      ctx.fillStyle = C.fg; ctx.fillRect(plotR + 1, CH.hy - 9, axisW - 1, 18); ctx.fillStyle = C.surface; ctx.textAlign = 'left'; ctx.fillText(pl, plotR + 5, CH.hy);
+    }
+  }
+}
+function chartNote() {
+  const box = $('chartNote'); box.replaceChildren();
+  const x = CH.x; if (!x) return;
+  const res = x.res, nL = res ? res.labels.length : 0, gone = res ? res.chartVisibleFrom : 0;
+  const p = el('p', 'hint');
+  p.textContent = `${x.tf} 확정 봉 ${nf(x.bars.n)}개, 라벨 ${nf(nL)}개입니다. 드래그로 옮기고, 휠이나 버튼으로 확대합니다. 라벨은 지표가 그리는 위치와 크기를 따릅니다.` +
+    (x.bars.partial ? ` 속이 빈 마지막 봉은 진행 중인 봉(${iso(x.bars.partial.start)} 시작, ${iso(x.bars.partial.last)}까지 반영)이고, 신호를 세지 않습니다.` : '');
+  box.append(p);
+  if (gone > 0) {
+    const q = el('p', 'hint fade-key');
+    const s = el('span', 'k13'); s.style.cssText = `--c:${FAM_COLOR[FAMS[0]]};--i:#fff;opacity:.3`; s.textContent = '13';
+    q.append(s, document.createTextNode(`흐린 라벨 ${nf(gone)}개는 TradingView 차트에서는 지워진 라벨입니다. 지표가 라벨을 최근 ${OPT.labelLimit}개까지만 남기기 때문입니다. 흐린 라벨은 ${iso(x.bars.start[res.labels[gone - 1].bar])}까지입니다.`));
+    box.append(q);
+  }
+}
+function readout(i) {
+  const box = $('readout'); box.replaceChildren();
+  const x = CH.x; if (!x || !CH.total) return;
+  if (i < 0 || i >= CH.total) i = CH.n ? CH.n - 1 : CH.total - 1;
+  const B = barAt(i), prev = i > 0 ? barAt(i - 1).c : null;
+  box.append(el('span', 'd', `${x.tf} ${iso(B.s)}${B.e !== B.s ? ' ~ ' + iso(B.e).slice(5) : ''}`));
+  if (B.partial) box.append(el('span', 'm', `진행 중 (${iso(B.last)}까지)`));
+  const cls = B.c >= B.o ? 'up' : 'dn';
+  for (const [k, v] of [['시', B.o], ['고', B.h], ['저', B.l], ['종', B.c]]) { const s = el('span'); s.append(el('span', 'm', k + ' '), el('span', cls, fmtPrice(v))); box.append(s); }
+  if (prev) { const ch = (B.c / prev - 1) * 100; box.append(el('span', ch >= 0 ? 'up' : 'dn', `${ch >= 0 ? '+' : ''}${ch.toFixed(2)}%`)); }
+  const ks = !B.partial && x.byBar.get(i);
+  if (ks) for (const k of ks) {
+    const L = x.res.labels[k], s = el('span', 'lb');
+    s.append(chipEl(L.kind, L.text, L.family), document.createTextNode(`${SIDE[L.dir]}${L.family != null ? ' ' + FAM_NAME[L.family] : ''}${L.kind === 'C' ? ' · 시작 ' + L.origins.map((o) => iso(x.bars.start[o])).join(', ') : ''}${k < x.res.chartVisibleFrom ? ' · 차트에서 지워짐' : ''}`));
+    box.append(s);
+  }
+}
+// bring the chart panel (readout and candles) on screen when the candles are not fully visible below the app bar
+function revealChart() {
+  const p = $('chart').closest('.chartp'), top = p.getBoundingClientRect().top, bottom = $('chart').getBoundingClientRect().bottom;
+  if (top < document.querySelector('.appbar').offsetHeight || bottom > innerHeight) p.scrollIntoView({ block: 'start' });
+}
+function chartIndexAt(px) { const g = CH.geo; if (!g) return -1; const i = Math.floor((px - g.plotL) / g.bw + CH.i0); return i >= 0 && i < CH.total && px <= g.plotR ? i : -1; }
+function zoomAt(px, factor) {
+  const g = CH.geo; if (!g) return;
+  const span = CH.i1 - CH.i0, anchor = CH.i0 + (px - g.plotL) / (g.plotR - g.plotL) * span;
+  const ns = Math.max(12, Math.min(Math.max(30, CH.total + 40), span * factor));
+  CH.i0 = anchor - (anchor - CH.i0) * ns / span; CH.i1 = CH.i0 + ns; clampView(); scheduleDraw();
+}
+function panBy(bars) { CH.i0 += bars; CH.i1 += bars; clampView(); scheduleDraw(); }
+function wireChart() {
+  const cv = $('chart');
+  cv.addEventListener('pointerdown', (e) => {
+    if (!CH.x) return;
+    cv.setPointerCapture(e.pointerId);
+    CH.drag = { id: e.pointerId, x: e.clientX, i0: CH.i0, i1: CH.i1, moved: false };
+  });
+  cv.addEventListener('pointermove', (e) => {
+    if (!CH.x || !CH.geo) return;
+    const r = cv.getBoundingClientRect(), px = e.clientX - r.left, py = e.clientY - r.top;
+    if (CH.drag && CH.drag.id === e.pointerId) {
+      const dx = e.clientX - CH.drag.x;
+      if (Math.abs(dx) > 3) { CH.drag.moved = true; cv.classList.add('drag'); }
+      if (CH.drag.moved) { const span = CH.drag.i1 - CH.drag.i0; CH.i0 = CH.drag.i0 - dx / CH.geo.bw; CH.i1 = CH.i0 + span; clampView(); }
+    }
+    CH.hover = chartIndexAt(px); CH.hy = py; scheduleDraw(); readout(CH.hover >= 0 ? CH.hover : CH.sel);
+  });
+  const end = (e) => {
+    if (CH.drag && CH.drag.id === e.pointerId) { if (!CH.drag.moved && e.type === 'pointerup') { CH.sel = CH.hover; } CH.drag = null; cv.classList.remove('drag'); }
+  };
+  cv.addEventListener('pointerup', end); cv.addEventListener('pointercancel', end);
+  cv.addEventListener('pointerleave', (e) => { if (e.pointerType === 'touch') return; CH.hover = -1; scheduleDraw(); readout(CH.sel); });
+  cv.addEventListener('wheel', (e) => {
+    if (!CH.x || !CH.geo) return;
+    e.preventDefault();
+    const r = cv.getBoundingClientRect();
+    if (Math.abs(e.deltaX) > Math.abs(e.deltaY)) panBy(e.deltaX / CH.geo.bw);
+    else zoomAt(e.clientX - r.left, Math.exp(Math.max(-0.5, Math.min(0.5, e.deltaY * (e.deltaMode ? 0.05 : 0.0018)))));
+  }, { passive: false });
+  cv.addEventListener('dblclick', () => { chartReset(); scheduleDraw(); });
+  cv.addEventListener('keydown', (e) => {
+    if (!CH.x || !CH.geo) return;
+    const span = CH.i1 - CH.i0, k = e.key;
+    if (k === 'ArrowLeft') panBy(-span * 0.1); else if (k === 'ArrowRight') panBy(span * 0.1);
+    else if (k === '+' || k === '=' || k === 'ArrowUp') zoomAt((CH.geo.plotL + CH.geo.plotR) / 2, 0.8);
+    else if (k === '-' || k === 'ArrowDown') zoomAt((CH.geo.plotL + CH.geo.plotR) / 2, 1.25);
+    else if (k === 'Home') { CH.i0 = -2; CH.i1 = CH.i0 + span; clampView(); scheduleDraw(); }
+    else if (k === 'End') { chartReset(); scheduleDraw(); }
+    else return;
+    e.preventDefault();
+  });
+  document.querySelector('.zoom').addEventListener('click', (e) => {
+    const b = e.target.closest('button'); if (!b || !CH.x || !CH.geo) return;
+    const span = CH.i1 - CH.i0, mid = CH.geo.plotR;
+    if (b.dataset.z === 'in') zoomAt(mid, 0.7); else if (b.dataset.z === 'out') zoomAt(mid, 1.4);
+    else if (b.dataset.z === 'left') panBy(-span * 0.25); else if (b.dataset.z === 'right') panBy(span * 0.25);
+    else { chartReset(); scheduleDraw(); }
+  });
+}
+
+// ---------- TD barcode: 20 timeframes on one date axis ----------
+let BC = null;
+function drawBarcode() {
+  const cv = $('bcode'); if (!CUR) return;
+  const det = CUR.det, W = cv.parentElement.clientWidth, small = W < 600;
+  const rowH = small ? 13 : 15, labelW = 38, padR = 6, axisH = 18, H = TFS.length * rowH + axisH;
+  const ctx = setupCanvas(cv, W, H);
+  let first = Infinity; for (const x of det.tfs) if (x.bars.n) first = Math.min(first, x.bars.start[0]);
+  if (!(first < Infinity)) first = LAST - 365;
+  const end = LAST + 1, start = state.bc === 'all' ? first : Math.max(first, end - Math.round(Number(state.bc) * 365.25));
+  const plotW = W - labelW - padR, X = (d) => labelW + (d - start) / (end - start) * plotW;
+  BC = { start, end, rowH, labelW, plotW, X, H, axisH };
+  const repCol = `color-mix(in srgb, ${SETUP_COLOR} 50%, ${C.surface})`;
+  ctx.font = '10.5px "IBM Plex Mono", monospace'; ctx.textBaseline = 'middle'; ctx.textAlign = 'right';
+  det.tfs.forEach((x, j) => {
+    const y = j * rowH, mid = y + rowH / 2, half = rowH / 2 - 1, sel = x.tf === state.tf;
+    ctx.fillStyle = sel ? C.fg : C.muted; ctx.font = (sel ? '600 ' : '') + '10.5px "IBM Plex Mono", monospace'; ctx.fillText(x.tf, labelW - 6, mid);
+    if (sel) { ctx.fillStyle = C.accent; ctx.globalAlpha = 0.12; ctx.fillRect(labelW, y, plotW, rowH); ctx.globalAlpha = 1; }
+    if (!x.bars.n) return;
+    const s0 = Math.max(start, x.bars.start[0]), s1 = x.bars.end[x.bars.n - 1] + 1;
+    if (s1 > start) { ctx.fillStyle = C.sunken; ctx.fillRect(X(s0), y + 1, X(s1) - X(s0), rowH - 2); ctx.fillStyle = C.line; ctx.fillRect(X(s0), Math.round(mid), X(s1) - X(s0), 1); }
+    if (!x.res) return;
+    // 9 on the outer part of each half, 13 on the inner part (next to the middle line)
+    for (const L of x.res.labels) {
+      if (!(L.kind === 'C' || (L.kind === 'S' && L.text.startsWith('9')))) continue;
+      const bs = x.bars.start[L.bar], be = x.bars.end[L.bar] + 1; if (be <= start) continue;
+      const x0 = X(Math.max(bs, start)), w = Math.max(small ? 1.5 : 2, X(be) - x0);
+      if (L.kind === 'S') { const h = half * 0.42; ctx.fillStyle = L.raw > 9 ? repCol : SETUP_COLOR; ctx.fillRect(x0, L.dir === SELL ? y + 1 : y + rowH - 1 - h, w, h); }
+    }
+    for (const L of x.res.labels) {
+      if (L.kind !== 'C') continue;
+      const bs = x.bars.start[L.bar], be = x.bars.end[L.bar] + 1; if (be <= start) continue;
+      const x0 = X(Math.max(bs, start)), w = Math.max(small ? 1.5 : 2, X(be) - x0), h = half * 0.58;
+      ctx.fillStyle = FAM_COLOR[L.family]; ctx.fillRect(x0, L.dir === SELL ? mid - h : mid, w, h);
+    }
+  });
+  // year / month ticks
+  ctx.font = '10.5px "IBM Plex Mono", monospace'; ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic'; ctx.fillStyle = C.muted;
+  const yrs = (end - start) / 365.25; let lastX = -Infinity;
+  const y0 = new Date(start * DAY).getUTCFullYear(), y1 = new Date(end * DAY).getUTCFullYear();
+  const marks = [];
+  if (yrs > 2.5) for (let y = y0 + 1; y <= y1; y++) marks.push([Date.UTC(y, 0, 1) / DAY, String(y)]);
+  else for (let y = y0; y <= y1; y++) for (let m = 0; m < 12; m += yrs > 1.2 ? 3 : 1) { const d = Date.UTC(y, m, 1) / DAY; if (d > start && d < end) marks.push([d, `${y}-${String(m + 1).padStart(2, '0')}`]); }
+  for (const [d, t] of marks) { const xx = X(d); if (xx - lastX < 56 || xx > W - 20) continue; ctx.fillStyle = C.line; ctx.fillRect(Math.round(xx), 0, 1, TFS.length * rowH); ctx.fillStyle = C.muted; ctx.fillText(t, xx, H - 4); lastX = xx; }
+}
+function barcodeAt(ev) {
+  if (!BC || !CUR) return null;
+  const r = $('bcode').getBoundingClientRect(), px = ev.clientX - r.left, py = ev.clientY - r.top;
+  const j = Math.floor(py / BC.rowH); if (j < 0 || j >= TFS.length || px < BC.labelW) return { j: j >= 0 && j < TFS.length ? j : -1, day: null };
+  const day = Math.floor(BC.start + (px - BC.labelW) / BC.plotW * (BC.end - BC.start));
+  return { j, day, px };
+}
+function wireBarcode() {
+  const cv = $('bcode');
+  cv.addEventListener('pointermove', (ev) => {
+    const at = barcodeAt(ev); if (!at || at.j < 0 || at.day == null) { hideTip(); return; }
+    const x = CUR.det.tfs[at.j], out = [el('div', 'h1', `${x.tf} · ${iso(at.day)}`)];
+    if (!x.res) { out.push(muted('봉 없음')); showTip(ev.clientX, ev.clientY, out); return; }
+    // labels whose bar holds the day, or within 2px of it
+    const tol = 2 / BC.plotW * (BC.end - BC.start), hits = [];
+    for (const L of x.res.labels) { if (!(L.kind === 'C' || L.kind === 'S')) continue; const bs = x.bars.start[L.bar], be = x.bars.end[L.bar] + 1; if (at.day + tol >= bs && at.day - tol < be) hits.push(L); }
+    if (!hits.length) out.push(muted('9나 13이 없습니다. 누르면 이 날짜로 차트를 옮깁니다.'));
+    for (const L of hits) out.push(tipRow(chipEl(L.kind, L.text, L.family), `${SIDE[L.dir]} ${ARROW[L.dir]}${L.family != null ? ' · ' + FAM_NAME[L.family] : ''}`, muted(iso(x.bars.start[L.bar]))));
+    showTip(ev.clientX, ev.clientY, out);
+  });
+  cv.addEventListener('pointerleave', hideTip);
+  cv.addEventListener('click', (ev) => { const at = barcodeAt(ev); if (!at || at.j < 0) return; selectTf(TFS[at.j], at.day); revealChart(); });
+}
+
+// ---------- per-timeframe state ----------
+function renderStateTable() {
+  const tbl = $('stateTbl'); tbl.replaceChildren(); $('stNote').hidden = HAS_TG; if (!CUR) return;
+  const det = CUR.det, famCols = FAMS;
+  const thead = el('thead'), hr = el('tr');
+  for (const h of ['TF', '마지막 봉', '셋업 ▼ / ▲', ...famCols.map((f) => FAM_NAME[f]), '최근 9', '최근 13', '다음 봉 조건']) hr.append(el('th', null, h));
+  thead.append(hr); tbl.append(thead);
+  const tb = el('tbody');
+  det.tfs.forEach((x, j) => {
+    const tr = el('tr'); if (x.tf === state.tf) tr.className = 'sel';
+    const b = el('button', 'tfb', x.tf); b.type = 'button'; b.dataset.tf = x.tf; b.setAttribute('aria-pressed', String(x.tf === state.tf));
+    const td0 = el('td'); td0.append(b); tr.append(td0);
+    if (!x.bars.n) { const td = el('td', null, '확정 봉 없음'); td.colSpan = 6 + famCols.length; td.style.color = 'var(--muted)'; tr.append(td); tb.append(tr); return; }
+    const st = x.res.state, last = x.bars.n - 1;
+    tr.append(el('td', 'mono', iso(x.bars.start[last])));
+    tr.append(el('td', 'mono', `▼ ${st.buyRaw} / ▲ ${st.sellRaw}`));
+    for (const f of famCols) {
+      const td = el('td'), g = el('span', 'runs');
+      for (const d of [BUY, SELL]) {
+        let act = 0, hi = 0; for (const r of st.runs) if (r.family === f && r.direction === d) { act++; hi = Math.max(hi, r.n); }
+        const s = el('span', act ? null : 'z', `${ARROW[d]} ${act}/${hi}`); if (act && hi >= 12) s.style.color = FAM_COLOR[f]; g.append(s);
+      }
+      td.append(g); tr.append(td);
+    }
+    let l9 = -1, l13 = -1; for (let k = x.res.labels.length - 1; k >= 0 && (l9 < 0 || l13 < 0); k--) { const L = x.res.labels[k]; if (l9 < 0 && L.kind === 'S' && L.text.startsWith('9')) l9 = k; if (l13 < 0 && L.kind === 'C') l13 = k; }
+    for (const k of [l9, l13]) {
+      const td = el('td');
+      if (k < 0) td.append(muted('없음'));
+      else { const L = x.res.labels[k], s = el('span', 'lb'); s.style.cssText = 'display:inline-flex;gap:5px;align-items:center'; s.append(chipEl(L.kind, L.text, L.family), el('span', 'mono', `${ARROW[L.dir]} ${iso(x.bars.start[L.bar])}`)); td.append(s); td.title = `${last - L.bar}봉 전${L.family != null ? ' · ' + FAM_NAME[L.family] : ''}`; }
+      tr.append(td);
+    }
+    const tg = trigsOf(det, j), td = el('td', 'trg');
+    if (tg && tg.error) td.append(muted(`다음 봉 조건을 계산하지 못했습니다 (${tg.error}).`));
+    else if (!Array.isArray(tg)) td.append(muted('–'));
+    else if (!tg.length) td.append(muted('–'));
+    else {
+      const P = x.bars.partial;
+      for (const t of tg) {
+        const d = el('div'); d.append(chipEl(t.k === 'C13' ? 'C' : 'S', t.k === 'C13' ? '13' : '9', t.f), document.createTextNode(' ' + trigText(t)));
+        if (P) { const ok = evalTg(t, { o: P.o, h: P.h, l: P.l, c: P.c }); d.append(el('span', ok ? 'ok' : 'm', ok ? ' · 지금까지의 값으로 충족' : ' · 지금까지의 값으로는 아직 아님')); }
+        td.append(d);
+      }
+    }
+    tr.append(td);
+    tb.append(tr);
+  });
+  tbl.append(tb);
+}
+
+// ---------- full label list of the chosen timeframe ----------
+let LL_LIMIT = 200;
+function labelKey(L, bars) {
+  const extra = L.kind === 'S' ? String(L.raw) : L.kind === 'C' ? L.origins.map((o) => iso(bars.start[o])).join(',') : iso(bars.start[L.origin]);
+  return [iso(bars.start[L.bar]), L.kind, L.dir, L.family == null ? '-' : L.family, L.text, extra].join('|');
+}
+function renderLabelList() {
+  const tbl = $('labelTbl'); tbl.replaceChildren(); $('llMore').replaceChildren();
+  if (!CUR) return;
+  const x = CUR.det.tfs[TFS.indexOf(state.tf)], res = x.res, b = x.bars, labels = res ? res.labels : [];
+  const gone = res ? res.chartVisibleFrom : 0;
+  $('llHint').textContent = labels.length
+    ? `${x.tf}에서 지표가 만든 라벨 ${nf(labels.length)}개입니다. 최신 순입니다. 날짜는 봉이 시작하는 날입니다.${gone ? ` 아래쪽 ${nf(gone)}개는 TradingView 차트에서는 지워진 라벨입니다.` : ''}`
+    : `${x.tf}에는 라벨이 없습니다.`;
+  if (!labels.length) return;
+  const thead = el('thead'), hr = el('tr'); for (const h of ['날짜', '라벨', '종류', '계열', '방향', '카운트다운 시작 봉', '차트']) hr.append(el('th', null, h)); thead.append(hr); tbl.append(thead);
+  const tb = el('tbody'), stop = Math.max(0, labels.length - LL_LIMIT);
+  for (let k = labels.length - 1; k >= stop; k--) {
+    const L = labels[k], tr = el('tr'); tr.dataset.k = labelKey(L, b); if (k < gone) tr.className = 'gone';
+    const date = el('td', 'mono', iso(b.start[L.bar]));
+    const lab = el('td'); lab.append(chipEl(L.kind, L.text, L.family));
+    const origin = L.kind === 'C' ? L.origins.map((o) => iso(b.start[o])).join(', ') : L.kind !== 'S' && L.origin != null ? iso(b.start[L.origin]) : '–';
+    tr.append(date, lab, el('td', null, labelKindText(L, b)), el('td', null, L.family == null ? '–' : FAM_NAME[L.family]), el('td', null, `${SIDE[L.dir]} ${ARROW[L.dir]}`), el('td', 'mono', origin), el('td', null, k < gone ? '지워짐' : '보임'));
+    tr.addEventListener('click', () => { chartCenterOn(b.start[L.bar]); revealChart(); });
+    tb.append(tr);
+  }
+  tbl.append(tb);
+  if (stop > 0) {
+    const box = $('llMore'), m = el('button', 'btn more-btn', `더 보기 · ${nf(Math.min(200, stop))}개 더 (${nf(stop)}개 남음)`); m.type = 'button';
+    m.addEventListener('click', () => { LL_LIMIT += 200; renderLabelList(); });
+    const all = el('button', 'btn more-btn', '모두 보기'); all.type = 'button'; all.dataset.all = '1';
+    all.addEventListener('click', () => { LL_LIMIT = Infinity; renderLabelList(); });
+    box.style.display = 'flex'; box.style.justifyContent = 'center'; box.style.gap = '8px'; box.append(m, all);
+  }
+}
+
+// ====================================================================================================
+// verification page
+// ====================================================================================================
+function renderCheck() {
+  hideTip();
+  const fresh = $('ckFresh'); fresh.replaceChildren();
+  const now = Date.now(), closeAge = (now - (LAST + 1) * DAY) / 3600e3, fetchAge = (now - Date.parse(DATA.fetchedAt)) / 3600e3;
+  const at = (t) => new Date(t).toISOString().replace('T', ' ').slice(0, 16) + ' UTC';
+  if (closeAge > 36) fresh.append(el('p', 'banner bad', `주의: 마지막으로 마감된 일봉(${DATA.lastClosedDay})이 끝난 지 ${Math.floor(closeAge)}시간이 지났습니다. 매일 수집이 멈췄을 수 있습니다.`));
+  else fresh.append(el('p', 'okline', `최신 데이터입니다. 마지막으로 마감된 일봉 ${DATA.lastClosedDay}이 끝난 지 ${Math.max(0, Math.floor(closeAge))}시간이 지났습니다.`));
+  const dl = el('dl', 'kv');
+  const kv = (k, v) => dl.append(el('dt', null, k), el('dd', null, v));
+  kv('마지막으로 마감된 일봉', DATA.lastClosedDay);
+  kv('TradingView 수집 시각', `${at(DATA.fetchedAt)} (${Math.floor(fetchAge)}시간 전)`);
+  kv('수집한 티커', `${nf(DATA.fetch.ok)} / ${nf(DATA.fetch.total)}개 성공, 실패 ${nf(DATA.fetch.failed)}개`);
+  kv('지난 수집과 다른 이력', `${nf(DATA.fetch.revised)}개 티커 (TradingView가 과거 봉을 고친 경우 포함)`);
+  kv('종목 목록 기준', `${DATA.universeAt ? at(DATA.universeAt) : '–'} · ${nf(COINS.length)}종, 그중 데이터 있는 종목 ${nf(COINS.filter((c) => c.t).length)}종`);
+  kv('빌드', DATA.build);
+  fresh.append(dl);
+  // verification
+  const v = $('ckVerify'); v.replaceChildren();
+  const V = DATA.verify;
+  if (!V || !Array.isArray(V.runs)) { v.append(el('p', 'banner bad', '이 빌드에는 검증 결과가 없습니다.')); }
+  else {
+    const bad = V.runs.reduce((s, r) => s + (r.mismatchedFiles || 0), 0), files = V.runs.reduce((s, r) => s + (r.files || 0), 0);
+    v.append(el('p', bad ? 'badline' : 'okline', bad ? `불일치 파일 ${nf(bad)}개가 있습니다.` : `불일치 0건 · 비교한 파일 ${nf(files)}개가 모두 같습니다.`));
+    v.append(el('p', 'hint', '같은 지표(TD Research v6 Pine 스크립트)를 서로 따로 옮긴 두 프로그램, 사이트가 쓰는 JavaScript 엔진과 Python 참조 구현이 티커·타임프레임마다 만든 결과 파일(봉, 라벨, 마지막 상태)을 한 바이트씩 비교했습니다.'));
+    const vd = V.data || {};
+    const same = vd.fetchedAt === DATA.fetchedAt;
+    v.append(el('p', same ? 'hint' : 'banner bad', `검증에 쓴 데이터: ${vd.lastClosedDay || '–'} 마감 봉, ${vd.fetchedAt ? at(vd.fetchedAt) : '–'} 수집 · 검증 시각 ${V.generatedAt ? at(V.generatedAt) : '–'}. ${same ? '이 페이지와 같은 데이터입니다.' : '이 페이지의 데이터와 다른 수집분으로 검증했습니다.'}`));
+    const tw = el('div', 'tw'), t = el('table', 'lt'), th = el('thead'), hr = el('tr');
+    for (const h of ['실행', '설정', '티커', '비교한 파일', '불일치 파일', '확정 봉', '라벨 (9 / 진행·+13 / 13)']) hr.append(el('th', null, h));
+    th.append(hr); t.append(th);
+    const tb = el('tbody');
+    for (const r of V.runs) {
+      const tr = el('tr'); const opts = r.options && Object.keys(r.options).length ? Object.entries(r.options).map(([k, x]) => `${k}=${x}`).join(', ') : '지표 기본값';
+      tr.append(el('td', 'mono', r.name), el('td', 'wrap', opts), el('td', 'mono', r.tickers === 'all' ? '전체' : String(r.tickers)), el('td', 'mono', nf(r.files)),
+        el('td', 'mono', String(r.mismatchedFiles)), el('td', 'mono', r.confirmedBars != null ? nf(r.confirmedBars) : '–'),
+        el('td', 'mono', r.labels ? `${nf(r.labels.S || 0)} / ${nf(r.labels.I || 0)} / ${nf(r.labels.C || 0)}` : '–'));
+      if (r.mismatchedFiles) tr.style.color = 'var(--bad-fg)';
+      tb.append(tr);
+    }
+    t.append(tb); tw.append(t); v.append(tw);
+  }
+  // spot checks
+  const ck = $('ckChecks'); ck.replaceChildren();
+  const th = el('thead'), hr = el('tr'); for (const h of ['종목', 'TF', '봉 날짜', '라벨', '방향', '계열', 'TradingView', '이 사이트']) hr.append(el('th', null, h)); th.append(hr); ck.append(th);
+  const tb = el('tbody');
+  for (const [sym, usd, tf, day, kind, dir, fam, text] of DATA.checks || []) {
+    const c = COINS.find((x) => x.s === sym), tr = el('tr');
+    const tv = el('a', null, `${tf} 차트 ↗`); tv.href = tvUrl(usd, tf); tv.target = '_blank'; tv.rel = 'noopener';
+    const me = el('a', null, '종목 상세'); if (c) { me.href = '#coin-' + c.slug; me.addEventListener('click', () => { state.tf = tf; save(); }); }
+    const lab = el('td'); lab.append(chipEl(kind, text, fam));
+    tr.append(el('td', 'mono', sym), el('td', 'mono', tf), el('td', 'mono', iso(day)), lab, el('td', null, `${SIDE[dir]} ${ARROW[dir]}`), el('td', null, fam == null ? '셋업' : FAM_NAME[fam]));
+    const a1 = el('td'); a1.append(tv); const a2 = el('td'); a2.append(me); tr.append(a1, a2);
+    tb.append(tr);
+  }
+  ck.append(tb);
+}
+
+// ====================================================================================================
+// routing, controls, theme
+// ====================================================================================================
+const SCREENS = ['screener', 'board', 'coin', 'check'];
+const SCROLL = {};
+function route() {
+  if (state.screen) SCROLL[state.screen] = window.scrollY;
+  if (state.screen === 'screener') SCROLL.tbl = $('tblw').scrollTop;
+  let h = location.hash.slice(1);
+  try { h = decodeURIComponent(h); } catch (e) { /* keep raw */ }
+  h = h.toLowerCase();
+  if (h === 'board') state.screen = 'board';
+  else if (h === 'check') state.screen = 'check';
+  else if (h.startsWith('coin-')) { state.screen = 'coin'; state.coin = h.slice(5); }
+  else state.screen = 'screener';
+  for (const s of SCREENS) {
+    $('screen-' + s).hidden = state.screen !== s;
+    $('tab-' + s).setAttribute('aria-current', state.screen === s ? 'page' : 'false');
+  }
+  const shown = coinBySlug(state.screen === 'coin' ? state.coin : state.lastCoin) || coinBySlug('btc') || COINS[0];
+  $('tab-coin').textContent = `종목 상세 · ${shown.s}`;
+  $('tab-coin').href = '#coin-' + shown.slug;
+  hideTip();
+  if (state.screen === 'screener') { $('tblw').scrollTop = SCROLL.tbl || 0; renderScreener(false, true); }
+  else if (state.screen === 'board') renderBoard();
+  else if (state.screen === 'coin') { LL_LIMIT = 200; renderCoin(); }
+  else renderCheck();
+  const top = state.screen === 'coin' ? 0 : SCROLL[state.screen] || 0;
+  if (Math.abs(window.scrollY - top) > 1) window.scrollTo({ top });
+}
+function wireControls() {
+  $('famSeg').innerHTML = FAMS.map((f) => `<button type="button" data-fam="${f}" title="${esc(FAM_FULL[f])}"><i style="background:var(--f${f})"></i>${FAM_NAME[f]}</button>`).join('');
+  document.addEventListener('click', (e) => {
+    const b = e.target.closest('button'); if (!b) return;
+    const d = b.dataset;
+    if (d.side) { state.side = d.side; save(); renderScreener(); }
+    else if (d.fam) { const f = Number(d.fam); state.fam = state.fam.includes(f) ? state.fam.filter((x) => x !== f) : [...state.fam, f].sort(); save(); renderScreener(); }
+    else if (d.nines) { state.nines = d.nines === '1'; save(); renderScreener(); }
+    else if (d.win) { state.win = Number(d.win); save(); renderScreener(); }
+    else if (d.ex) { state.ex = state.ex.includes(d.ex) ? state.ex.filter((x) => x !== d.ex) : [...state.ex, d.ex]; save(); renderScreener(false); }
+    else if (d.sort && b.closest('#sortSeg')) { state.sort = d.sort; save(); renderScreener(false); }
+    else if (d.btf) { state.btf = d.btf; save(); renderBoard(); }
+    else if (d.br) { state.br = d.br; save(); renderBoard(); }
+    else if (d.bm) { state.bm = d.bm; save(); renderBoard(); }
+    else if (d.bn) { state.bn = d.bn === '1'; save(); renderBoard(); }
+    else if (d.mj != null) {
+      const pick = { j: Number(d.mj), d: Number(d.md), k: d.mk };
+      MTX_PICK = MTX_PICK && MTX_PICK.j === pick.j && MTX_PICK.d === pick.d && MTX_PICK.k === pick.k ? null : pick;
+      if (MTX_PICK) state.btf = TFS[MTX_PICK.j]; save(); renderBoard();
+    }
+    else if (d.tf && (b.closest('#tfSeg') || b.closest('#stateTbl'))) selectTf(d.tf);
+    else if (d.scale) { state.scale = d.scale; save(); syncCoinControls(CUR ? CUR.c : null); chartDraw(); }
+    else if (d.bc) { state.bc = d.bc; save(); syncCoinControls(CUR ? CUR.c : null); drawBarcode(); }
+  });
+}
+let RT = 0, LAST_W = innerWidth;
+addEventListener('resize', () => {
+  clearTimeout(RT); RT = setTimeout(() => {
+    document.documentElement.style.setProperty('--appbar-h', document.querySelector('.appbar').offsetHeight + 'px');
+    if (state.screen === 'screener' && VT.list.length) renderSlice(true);
+    if (innerWidth === LAST_W && state.screen !== 'coin') return; LAST_W = innerWidth;
+    if (state.screen === 'board' && BOARD) { renderMatrix(); drawBreadth(); }
+    if (state.screen === 'coin' && CUR) { chartDraw(); drawBarcode(); }
+  }, 120);
+});
+addEventListener('scroll', () => { if (!$('scrBody').contains(document.activeElement)) hideTip(); }, { passive: true });
+addEventListener('hashchange', route);
+const rerender = () => { readColors(); if (state.screen === 'board' && BOARD) drawBreadth(); if (state.screen === 'coin' && CUR) { chartDraw(); drawBarcode(); } };
+try { matchMedia('(prefers-color-scheme: dark)').addEventListener('change', rerender); } catch (e) { /* old browsers */ }
+new MutationObserver(rerender).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+if (document.fonts && document.fonts.ready) document.fonts.ready.then(rerender);
+
+// ---------- start ----------
+{
+  const at = new Date(DATA.fetchedAt).toISOString().replace('T', ' ').slice(0, 16);
+  $('asof').textContent = `${DATA.lastClosedDay} 마감 · 종목 ${COINS.length}`;
+  const withData = COINS.filter((c) => c.t).length, added = COINS.filter((c) => !c.x).length;
+  $('scrLead').textContent = `업비트·빗썸·바이낸스에 상장된 ${nf(COINS.length - added)}종${added ? `과 직접 추가한 ${added}종` : ''}을 20개 타임프레임에서 셉니다. 봉은 TradingView 일봉과 TradingView 자체 1W·1M 봉(${DATA.lastClosedDay} 마감 봉까지, ${at} UTC 수집)으로 만듭니다. 지표는 TD Research v6 기본 설정이고, 마감된 봉만 셉니다.` +
+    (withData < COINS.length ? ` TradingView 데이터가 없는 ${COINS.length - withData}종은 데이터 없음으로 표시합니다.` : '');
+  // the newest closed day ended more than 36 hours ago: the daily collection has stopped
+  const age = (Date.now() - (LAST + 1) * DAY) / 3600e3;
+  if (age > 36) { const n = $('staleNotice'); n.hidden = false; n.textContent = `주의: 마지막으로 마감된 일봉이 ${DATA.lastClosedDay}이고, 이 봉이 끝난 지 ${Math.floor(age)}시간이 지났습니다. 매일 수집이 멈췄을 수 있습니다. 검증 화면에서 자세한 내용을 확인하세요.`; }
+  document.documentElement.style.setProperty('--appbar-h', document.querySelector('.appbar').offsetHeight + 'px');
+  readColors();
+  renderScoreHelp();
+  wireControls(); wireScreener(); wireChart(); wireBarcode();
+  buildTable(); syncScreenerControls();
+  route();
+  try { performance.mark('td-ready'); } catch (e) { /* no performance API */ }
+}
+</script>
