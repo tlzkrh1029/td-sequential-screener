@@ -1,5 +1,5 @@
 {
- "generatedAt": "2026-11-01T06:23:20.163Z",
+ "generatedAt": "2026-11-02T12:37:37.391Z",
  "runs": [
   {
    "name": "default",
@@ -8,18 +8,18 @@
    "tickers": "all",
    "tfs": "all",
    "seconds": {
-    "js": 7.1,
-    "py": 12.9
+    "js": 9.5,
+    "py": 14.8
    },
    "files": 11260,
    "mismatchedFiles": 0,
    "kinds": {},
-   "confirmedBars": 2877376,
+   "confirmedBars": 2879065,
    "labels": {
-    "S": 87511,
-    "I": 31892,
+    "S": 87568,
+    "I": 31921,
     "X": 0,
-    "C": 95629
+    "C": 95700
    },
    "mismatchedExamples": []
   },
@@ -35,18 +35,18 @@
    "tickers": 63,
    "tfs": "all",
    "seconds": {
-    "js": 1,
-    "py": 1.6
+    "js": 1.3,
+    "py": 1.7
    },
    "files": 1260,
    "mismatchedFiles": 0,
    "kinds": {},
-   "confirmedBars": 351421,
+   "confirmedBars": 351610,
    "labels": {
-    "S": 10713,
-    "I": 2152,
+    "S": 10722,
+    "I": 2157,
     "X": 0,
-    "C": 5072
+    "C": 5077
    },
    "mismatchedExamples": []
   },
@@ -63,18 +63,18 @@
    "tickers": 63,
    "tfs": "all",
    "seconds": {
-    "js": 1.8,
-    "py": 2
+    "js": 2,
+    "py": 2.4
    },
    "files": 1260,
    "mismatchedFiles": 0,
    "kinds": {},
-   "confirmedBars": 351421,
+   "confirmedBars": 351610,
    "labels": {
-    "S": 10713,
-    "I": 267958,
-    "X": 14656,
-    "C": 11792
+    "S": 10722,
+    "I": 268110,
+    "X": 14674,
+    "C": 11798
    },
    "mismatchedExamples": []
   },
@@ -92,18 +92,18 @@
    "tickers": 63,
    "tfs": "all",
    "seconds": {
-    "js": 1.4,
+    "js": 1.3,
     "py": 1.7
    },
    "files": 1260,
    "mismatchedFiles": 0,
    "kinds": {},
-   "confirmedBars": 351421,
+   "confirmedBars": 351610,
    "labels": {
-    "S": 10713,
-    "I": 21785,
+    "S": 10722,
+    "I": 21783,
     "X": 0,
-    "C": 9980
+    "C": 9981
    },
    "mismatchedExamples": []
   },
@@ -123,25 +123,25 @@
    "tickers": 63,
    "tfs": "all",
    "seconds": {
-    "js": 1.6,
-    "py": 2.2
+    "js": 2.2,
+    "py": 2.4
    },
    "files": 1260,
    "mismatchedFiles": 0,
    "kinds": {},
-   "confirmedBars": 351421,
+   "confirmedBars": 351610,
    "labels": {
-    "S": 340679,
-    "I": 65741,
+    "S": 340868,
+    "I": 65766,
     "X": 0,
-    "C": 7528
+    "C": 7534
    },
    "mismatchedExamples": []
   }
  ],
  "data": {
-  "fetchedAt": "2026-11-01T05:08:32.219Z",
-  "lastClosedDay": "2026-10-31"
+  "fetchedAt": "2026-11-02T12:31:11.791Z",
+  "lastClosedDay": "2026-11-01"
  },
  "ok": true
 }

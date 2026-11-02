@@ -1,8 +1,8 @@
 {
- "generatedAt": "2026-11-01T06:23:44.323Z",
+ "generatedAt": "2026-11-02T12:38:05.320Z",
  "data": {
-  "fetchedAt": "2026-11-01T05:08:32.219Z",
-  "lastClosedDay": "2026-10-31"
+  "fetchedAt": "2026-11-02T12:31:11.791Z",
+  "lastClosedDay": "2026-11-01"
  },
  "runs": [
   {
@@ -13,24 +13,24 @@
    "missing": [],
    "tfs": 20,
    "series": 11260,
-   "seconds": 19.4,
-   "bars": 2866165,
+   "seconds": 24,
+   "bars": 2867854,
    "triggers": {
-    "S9": 105136,
-    "S9r": 9518,
-    "C13": 551983
+    "S9": 105201,
+    "S9r": 9522,
+    "C13": 552383
    },
    "holding": {
-    "S9": 80302,
-    "S9r": 7209,
-    "C13": 97684
+    "S9": 80355,
+    "S9r": 7213,
+    "C13": 97756
    },
    "labels": {
-    "S9": 80302,
-    "S9r": 7209,
-    "C": 95629
+    "S9": 80355,
+    "S9r": 7213,
+    "C": 95700
    },
-   "withUnless": 8975,
+   "withUnless": 8979,
    "blocked": 21,
    "withRange": 0,
    "malformed": 0,
@@ -51,24 +51,24 @@
    "missing": [],
    "tfs": 20,
    "series": 1260,
-   "seconds": 2.1,
-   "bars": 350164,
+   "seconds": 2.7,
+   "bars": 350353,
    "triggers": {
-    "S9": 12891,
+    "S9": 12901,
     "S9r": 1190,
-    "C13": 34389
+    "C13": 34417
    },
    "holding": {
-    "S9": 9821,
+    "S9": 9830,
     "S9r": 892,
-    "C13": 5072
+    "C13": 5077
    },
    "labels": {
-    "S9": 9821,
+    "S9": 9830,
     "S9r": 892,
-    "C": 5072
+    "C": 5077
    },
-   "withUnless": 777,
+   "withUnless": 779,
    "blocked": 126,
    "withRange": 0,
    "malformed": 0,
@@ -90,24 +90,24 @@
    "missing": [],
    "tfs": 20,
    "series": 1260,
-   "seconds": 2.6,
-   "bars": 350164,
+   "seconds": 3.2,
+   "bars": 350353,
    "triggers": {
-    "S9": 12891,
+    "S9": 12901,
     "S9r": 1190,
-    "C13": 68260
+    "C13": 68313
    },
    "holding": {
-    "S9": 9821,
+    "S9": 9830,
     "S9r": 892,
-    "C13": 12048
+    "C13": 12054
    },
    "labels": {
-    "S9": 9821,
+    "S9": 9830,
     "S9r": 892,
-    "C": 11792
+    "C": 11798
    },
-   "withUnless": 1102,
+   "withUnless": 1103,
    "blocked": 1,
    "withRange": 0,
    "malformed": 0,
@@ -130,24 +130,24 @@
    "missing": [],
    "tfs": 20,
    "series": 1260,
-   "seconds": 2.7,
-   "bars": 350164,
+   "seconds": 2.8,
+   "bars": 350353,
    "triggers": {
-    "S9": 12891,
+    "S9": 12901,
     "S9r": 1190,
-    "C13": 59685
+    "C13": 59698
    },
    "holding": {
-    "S9": 9821,
+    "S9": 9830,
     "S9r": 892,
-    "C13": 9980
+    "C13": 9981
    },
    "labels": {
-    "S9": 9821,
+    "S9": 9830,
     "S9r": 892,
-    "C": 9980
+    "C": 9981
    },
-   "withUnless": 1198,
+   "withUnless": 1200,
    "blocked": 1,
    "withRange": 0,
    "malformed": 0,
@@ -172,26 +172,26 @@
    "missing": [],
    "tfs": 20,
    "series": 1260,
-   "seconds": 5.7,
-   "bars": 350164,
+   "seconds": 7,
+   "bars": 350353,
    "triggers": {
-    "S9": 12891,
+    "S9": 12901,
     "S9r": 0,
-    "C13": 265026
+    "C13": 265172
    },
    "holding": {
-    "S9": 9821,
+    "S9": 9830,
     "S9r": 0,
-    "C13": 7528
+    "C13": 7534
    },
    "labels": {
-    "S9": 9821,
+    "S9": 9830,
     "S9r": 0,
-    "C": 7528
+    "C": 7534
    },
-   "withUnless": 4967,
+   "withUnless": 4971,
    "blocked": 71,
-   "withRange": 4922,
+   "withRange": 4926,
    "malformed": 0,
    "disagreements": 0,
    "byKind": {},
