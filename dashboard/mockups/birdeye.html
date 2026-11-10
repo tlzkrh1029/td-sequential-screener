@@ -3,7 +3,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap">
-<style>
+<style id="be-shell-css">
 /* Bird eye design study. Three views behind the screener's app bar (whole market, one coin on many timeframes,
    timeframe ladder), two variants of each to compare. Tokens, controls and marks are the screener's own
    (dashboard/screener.html), so a chosen variant can move into the site as it is. */
@@ -214,6 +214,10 @@ const DATA = /*__DATA__*/null;
 //     render(why)   draw from the shared state; called after mount and on 'coin', 'fam', 'theme', 'resize'
 //     unmount()     optional: stop timers, drop listeners outside root
 // ====================================================================================================================
+// A host that puts this page inside its own <body> (a published artifact) leaves the style element above in the body,
+// while the variants append theirs to <head>. Move it to the head, so that a variant's rule still comes after a shell
+// rule of the same weight, as it does when this page is its own document.
+{ const css = document.getElementById('be-shell-css'); if (css && css.parentNode !== document.head) document.head.append(css); }
 const BE = (() => {
   const TFS = DATA.tfs, OPT = DATA.options, LAST = DATA.lastClosedDayN, DAY = 86400000;
   const COINS = DATA.coins.slice().sort((a, b) => a.r - b.r);
