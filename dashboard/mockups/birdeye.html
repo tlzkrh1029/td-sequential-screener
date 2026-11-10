@@ -1,0 +1,565 @@
+<title>TD Bird Eye 시안</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap">
+<style>
+/* Bird eye design study. Three views behind the screener's app bar (whole market, one coin on many timeframes,
+   timeframe ladder), two variants of each to compare. Tokens, controls and marks are the screener's own
+   (dashboard/screener.html), so a chosen variant can move into the site as it is. */
+:root {
+  --bg: #f4f6f8; --surface: #ffffff; --sunken: #eef1f4; --fg: #141922; --muted: #5b6574; --faint: #737c8a;
+  --line: #dfe3e8; --accent: #2f5bd3; --accent-soft: #e6ecfb; --warn-bg: #fff6db; --warn-fg: #7a5a00; --hl: #f2b300;
+  --bad-bg: #fde7e7; --bad-fg: #9b1116; --ok-fg: #0f7b3b;
+  --up: #089981; --down: #F23645; --setup: #787B86; --setup-ink: #5f626b;
+  --f0: #DC2A2A; --f1: #EB9223; --f2: #74279A; --f3: #E74BB1;
+  --fi0: #ffffff; --fi1: #141922; --fi2: #ffffff; --fi3: #141922;
+  --font-sans: "IBM Plex Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+  --r: 10px;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0e1116; --surface: #151a21; --sunken: #1b2129; --fg: #e5e8ee; --muted: #9aa3b1; --faint: #6c7584;
+    --line: #262e39; --accent: #7d9cf5; --accent-soft: #1e2840; --warn-bg: #33290d; --warn-fg: #f2cf6b; --hl: #ffc93c;
+    --bad-bg: #3b1416; --bad-fg: #ff8a84; --ok-fg: #3ddc84; --setup-ink: #a3a6b0;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0e1116; --surface: #151a21; --sunken: #1b2129; --fg: #e5e8ee; --muted: #9aa3b1; --faint: #6c7584;
+  --line: #262e39; --accent: #7d9cf5; --accent-soft: #1e2840; --warn-bg: #33290d; --warn-fg: #f2cf6b; --hl: #ffc93c;
+  --bad-bg: #3b1416; --bad-fg: #ff8a84; --ok-fg: #3ddc84; --setup-ink: #a3a6b0;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--fg); font-family: var(--font-sans); font-size: 14px; line-height: 1.5; word-break: keep-all; overflow-wrap: break-word; }
+h1, h2, h3 { margin: 0; text-wrap: balance; }
+h2 { font-size: 16px; font-weight: 600; }
+button { font: inherit; color: inherit; }
+input { font: inherit; color: inherit; }
+a { color: var(--accent); }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+[hidden] { display: none !important; }
+.num { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+/* shell (as the screener) */
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 21; background: var(--surface); }
+.appbar { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 20; background: var(--surface); border-bottom: 1px solid var(--line); }
+.appbar-in { max-width: 2200px; margin: 0 auto; padding-left: max(20px, env(safe-area-inset-left, 0px)); padding-right: max(20px, env(safe-area-inset-right, 0px)); display: flex; flex-wrap: wrap; align-items: center; gap: 0 18px; min-height: 52px; }
+.brand { font-weight: 700; font-size: 16px; letter-spacing: -.01em; white-space: nowrap; }
+.brand small { font-family: var(--font-mono); font-weight: 500; font-size: 11px; color: var(--muted); margin-left: 8px; }
+.tabs { display: flex; gap: 2px; overflow-x: auto; scrollbar-width: none; max-width: 100%; }
+.tabs::-webkit-scrollbar { display: none; }
+.tabs a { text-decoration: none; color: var(--muted); font-weight: 500; font-size: 14px; padding: 14px 12px 12px; border-bottom: 2px solid transparent; white-space: nowrap; }
+.tabs a[aria-current="page"] { color: var(--fg); border-bottom-color: var(--accent); }
+.tabs a:focus-visible { outline-offset: -2px; }
+.wrap { max-width: 2200px; margin: 0 auto; padding-left: max(20px, env(safe-area-inset-left, 0px)); padding-right: max(20px, env(safe-area-inset-right, 0px)); padding-block: 14px 40px; display: grid; gap: 12px; min-width: 0; grid-template-columns: minmax(0, 1fr); }
+.lead { margin: 0; font-size: 13px; color: var(--muted); }
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); min-width: 0; }
+.controls { display: flex; flex-wrap: wrap; gap: 10px 16px; align-items: center; padding: 10px 12px; }
+.ctl { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; min-width: 0; }
+.ctl > span { font-size: 12px; color: var(--muted); font-weight: 500; }
+.seg { display: inline-flex; flex-wrap: wrap; padding: 3px; gap: 2px; border-radius: 9px; background: var(--sunken); border: 1px solid var(--line); }
+.seg button { border: 0; background: transparent; padding: 4px 10px; border-radius: 6px; font-size: 13px; font-weight: 500; color: var(--muted); cursor: pointer; white-space: nowrap; }
+.seg button:hover { color: var(--fg); }
+.seg button[aria-pressed="true"] { background: var(--surface); color: var(--fg); box-shadow: 0 1px 2px rgb(0 0 0 / .14); }
+.seg.fam button i { display: inline-block; width: 9px; height: 9px; border-radius: 2px; margin-right: 5px; vertical-align: 0; }
+.seg.fam button[aria-pressed="false"] i { opacity: .35; }
+.hint { font-size: 12.5px; color: var(--muted); margin: 0; }
+.btn { border: 1px solid var(--line); background: var(--surface); border-radius: 8px; padding: 5px 11px; cursor: pointer; font-size: 13px; color: var(--fg); }
+.btn:hover { background: var(--sunken); }
+.btn:disabled { opacity: .45; cursor: default; }
+.btn.sm { padding: 3px 9px; font-size: 12.5px; }
+.loading, .empty { padding: 36px 12px; text-align: center; color: var(--muted); font-size: 13px; }
+.foot { font-size: 12px; color: var(--muted); display: flex; flex-wrap: wrap; gap: 4px 14px; padding-top: 4px; }
+
+/* indicator marks (as the screener): 13 = filled chip in the family color, 9 = gray outline, +13 = small colored text */
+.k13, .k9, .kd { font-family: var(--font-mono); font-weight: 600; font-style: normal; white-space: nowrap; display: inline-block; }
+.k13 { font-size: 11px; line-height: 15px; padding: 0 3px; border-radius: 4px; background: var(--c); color: var(--i); }
+.k9 { font-size: 11px; line-height: 13px; padding: 0 3px; border-radius: 4px; border: 1px solid var(--setup); color: var(--setup-ink); }
+.kd { font-size: 9.5px; line-height: 1; color: var(--c); font-weight: 700; }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 14px; align-items: center; font-size: 12px; color: var(--muted); }
+.legend > span { display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
+
+/* tooltip */
+.tip { position: fixed; z-index: 40; pointer-events: none; background: var(--surface); color: var(--fg); border: 1px solid var(--line); border-radius: 8px; box-shadow: 0 6px 18px rgb(0 0 0 / .18); padding: 8px 10px; font-size: 12px; max-width: min(380px, calc(100vw - 16px)); display: none; }
+.tip .h1 { font-family: var(--font-mono); font-size: 12px; font-weight: 600; margin-bottom: 2px; }
+.tip .m { color: var(--muted); }
+.tip .sec { margin-top: 6px; padding-top: 6px; border-top: 1px solid var(--line); display: grid; gap: 3px; }
+.tip .row { display: flex; gap: 6px; align-items: baseline; flex-wrap: wrap; }
+
+/* study shell: which variant, which coin, what the variant is */
+.vnote { padding: 10px 14px; display: grid; gap: 4px; }
+.vnote h2 { font-size: 15px; }
+.vnote h2 small { font-weight: 500; font-size: 12px; color: var(--muted); margin-left: 8px; }
+.vnote p { margin: 0; font-size: 13px; max-width: 110ch; }
+.vnote .pc { display: flex; flex-wrap: wrap; gap: 4px 22px; font-size: 12.5px; color: var(--muted); }
+.vnote .pc b { color: var(--fg); font-weight: 600; }
+.coinhead { display: flex; flex-wrap: wrap; gap: 6px 14px; align-items: baseline; }
+.coinhead h1 { font: 700 22px var(--font-mono); }
+.coinhead .nm { color: var(--muted); }
+.coinhead .meta { font-size: 12.5px; color: var(--muted); display: flex; flex-wrap: wrap; gap: 4px 12px; }
+.coinpick { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.coinpick input { border: 1px solid var(--line); background: var(--surface); border-radius: 8px; padding: 5px 10px; width: 150px; max-width: 100%; }
+.coinpick .quick { display: inline-flex; flex-wrap: wrap; gap: 4px; }
+.coinpick .quick button { border: 1px solid var(--line); background: var(--surface); border-radius: 999px; padding: 2px 9px; font: 600 12px var(--font-mono); cursor: pointer; color: var(--fg); }
+.coinpick .quick button[aria-pressed="true"] { background: var(--fg); color: var(--surface); border-color: var(--fg); }
+#stage { min-width: 0; display: grid; gap: 12px; grid-template-columns: minmax(0, 1fr); }
+
+@media (max-width: 720px) {
+  .appbar-in, .wrap { padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+  .appbar-in { gap: 0 10px; }
+  .brand { padding-top: 8px; }
+  .tabs a { padding: 10px 9px 9px; font-size: 13.5px; }
+  .coinhead h1 { font-size: 19px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { transition: none !important; animation: none !important; scroll-behavior: auto !important; }
+}
+</style>
+
+<header class="appbar">
+  <div class="appbar-in">
+    <div class="brand">TD Bird Eye 시안<small id="asof"></small></div>
+    <nav class="tabs" aria-label="화면" id="tabs"></nav>
+  </div>
+</header>
+
+<main class="wrap">
+  <p class="lead" id="lead"></p>
+  <div class="panel controls" role="group" aria-label="시안과 종목 고르기">
+    <div class="ctl"><span id="lb-var">시안</span><div class="seg" role="group" aria-labelledby="lb-var" id="varSeg"></div></div>
+    <div class="ctl" id="coinCtl"><span id="lb-coin">종목</span>
+      <div class="coinpick">
+        <button type="button" class="btn sm" id="prevCoin" aria-label="시가총액이 하나 높은 종목">←</button>
+        <input id="coinInput" type="search" list="coinList" placeholder="심볼 검색" aria-labelledby="lb-coin" autocomplete="off" spellcheck="false">
+        <datalist id="coinList"></datalist>
+        <button type="button" class="btn sm" id="nextCoin" aria-label="시가총액이 하나 낮은 종목">→</button>
+        <span class="quick" id="quick"></span>
+      </div>
+    </div>
+    <div class="ctl"><span id="lb-fam">계열</span><div class="seg fam" role="group" aria-labelledby="lb-fam" id="famSeg"></div></div>
+  </div>
+  <div class="panel vnote" id="vnote"></div>
+  <div class="coinhead" id="coinHead" hidden></div>
+  <div id="stage"></div>
+  <footer class="foot">
+    <span>코인 목록, 순위, 시가총액: CoinGecko · <a href="https://www.coingecko.com" target="_blank" rel="noopener">Data provided by CoinGecko</a></span>
+    <span>가격: TradingView CRYPTO:&lt;코인&gt;USD 일봉, 1W 봉, 1M 봉</span>
+    <span>지표: TD Research v6 기본 설정</span>
+  </footer>
+</main>
+<div class="tip" id="tip" role="tooltip"></div>
+
+<script>
+const DATA = /*__DATA__*/null;
+/*__BARS__*/
+/*__ENGINE__*/
+/*__MODULE:VIEW:../td-view.js__*/
+// ====================================================================================================================
+// BE: the study's core. Every variant file (be-<view>-<a|b>.js, one <script> each below) registers itself with
+// BE.register and draws only from what BE gives it. Nothing here or in a variant computes a TD count of its own:
+// labels, counts and next-bar triggers come from the engine (TD), bars from BARS, distances from VIEW (td-view.js).
+//
+// Data
+//   BE.COINS            every coin of the build, by market-cap rank: {r rank, s symbol, n name, k Korean name | null,
+//                       x exchanges ("UBN": U 업비트, B 빗썸, N 바이낸스), mc market cap, usd ticker | null, slug,
+//                       lc newest daily close, li / lb first / last daily bar day, t: per timeframe the build summary
+//                       | null (scripts/build-site.mjs summarize: n, ls, le, ps, pl, br, sr, ru, rl, l9, l13, tg, po),
+//                       t absent when the coin has no data}
+//   BE.TFS, BE.OPT      the 20 timeframes; the indicator inputs (TD Research v6 defaults)
+//   BE.LAST, BE.DATA    the last closed day (unix day number); the whole build data
+//   BE.FAMS             the families the indicator counts ([0, 2, 3] with the defaults); BE.FAM_NAME / FAM_CODE /
+//                       FAM_COLOR by family 0-3; BE.SETUP_COLOR; BE.BUY = -1, BE.SELL = 1, BE.SIDE, BE.ARROW
+//   BE.side(c, j, dir)  one side of one timeframe of a coin from the summary, cached: VIEW.sideState(...) =
+//                       {raw, to9, runs: [{f, count, hi}], labels: [{ago, kind 'S'|'I'|'C', f, text, raw, rep}],
+//                        trigs: [{t, k 'S9'|'S9r'|'C13', d, f, o, fire}], next13, next9}; fire = VIEW.fire(...) =
+//                       {now, p, pct, q, qpct, dir} | null (see td-view.js). null when the coin has no bar there.
+//                       The caller applies the family toggles (BE.famOn(f)).
+//   BE.detail(c)        Promise of one coin recounted in the browser from its daily data (cached):
+//                       {c, d daily data, mintick, last newest daily close, tfs: [per timeframe {tf, j, bars
+//                        (BARS.buildBars: start, end, first, last, o, h, l, c, n, partial), res (TD.runTD: labels,
+//                        chartVisibleFrom, state) | null without bars, base (VIEW.baseBar), trigs (VIEW.withFire of
+//                        TD.nextBarTriggers), runs: [{family, direction, n, originBar, originDay, ageBars}],
+//                        pad() label offsets, byBar() Map bar -> label indices}]}
+//                       Rejects with an Error (err.stale = a newer build was deployed) when the data cannot be read.
+// Shared state
+//   BE.state            {view 'market'|'sheet'|'ladder', key 'a'|'b' (the variant shown), coin (slug), fam: [..]}
+//   BE.coin()           the coin of the per-coin views; BE.famOn(f); BE.go({view, key, coin}) navigates (hash)
+//   BE.openCoin(slug, view = 'sheet')   from the market views: show that coin
+//   BE.vstate(id, defaults)             a variant's own settings object, kept in localStorage; BE.save() after a change
+// Drawing
+//   BE.el(tag, cls, text), BE.esc, BE.iso(day), BE.nf, BE.fmtPrice, BE.fmtPct(x), BE.fmtCap
+//   BE.chipHTML(kind, text, f) / BE.chipEl(...)   the screener's marks: 'C' 13 chip, 'S' 9 chip, 'I' +13
+//   BE.seg(label, [[value, text], ...], get, set)  a labelled segmented control (returns the .ctl element)
+//   BE.tip.show(x, y, nodes | html), BE.tip.hide()
+//   BE.setupCanvas(cv, w, h) -> ctx (device pixel ratio handled); BE.C canvas colors of the current theme
+//   BE.padArray(bars, mintick), BE.labelPrice(L, bars, pad), BE.labelColor(L), BE.LABEL_FONT   where and how the
+//                       indicator draws a label (as the screener's coin chart)
+//   BE.dateTicks(days, px), BE.tvUrl(usd, tf), BE.exNames(c), BE.nameOf(c), BE.agoText(ago)
+// A variant
+//   BE.register({ view, key, name, blurb, good: [..], weak: [..], mount(root), render(why), unmount() })
+//     mount(root)   build the variant's DOM inside root (an empty element); called each time the variant is shown
+//     render(why)   draw from the shared state; called after mount and on 'coin', 'fam', 'theme', 'resize'
+//     unmount()     optional: stop timers, drop listeners outside root
+// ====================================================================================================================
+const BE = (() => {
+  const TFS = DATA.tfs, OPT = DATA.options, LAST = DATA.lastClosedDayN, DAY = 86400000;
+  const COINS = DATA.coins.slice().sort((a, b) => a.r - b.r);
+  const $ = (id) => document.getElementById(id);
+  function el(tag, cls, text) { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
+  const esc = (s) => String(s).replace(/[&<>"']/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
+  const iso = (d) => BARS.isoOfDay(d);
+  const nf = (v) => Number(v).toLocaleString('en-US');
+  const BUY = -1, SELL = 1, SIDE = { [BUY]: '매수', [SELL]: '매도' }, ARROW = { [BUY]: '▼', [SELL]: '▲' };
+
+  // ---------- families and colors (the indicator's inputs) ----------
+  const FAM_NAME = ['Sequential', 'Aggressive Sequential', 'Combo', 'Aggressive Combo'];
+  const FAM_CODE = ['S', 'AS', 'C', 'AC'];
+  const FAM_COLOR = [OPT.seqColor, OPT.aggSeqColor, OPT.comboColor, OPT.aggComboColor];
+  const FAMS = [0, 1, 2, 3].filter((f) => [OPT.enableSeq, OPT.enableAggSeq, OPT.enableCombo, OPT.enableAggCombo][f]);
+  const SETUP_COLOR = OPT.setupColor || '#787B86';
+  function hexRgb(hex) { const h = String(hex).replace('#', ''); return [0, 2, 4].map((i) => parseInt(h.slice(i, i + 2), 16)); }
+  function relLum(c) { const f = (v) => { v /= 255; return v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; }; return 0.2126 * f(c[0]) + 0.7152 * f(c[1]) + 0.0722 * f(c[2]); }
+  function inkOn(hex) { const L = relLum(hexRgb(hex)), dark = relLum([20, 25, 34]); return 1.05 / (L + 0.05) >= (L + 0.05) / (dark + 0.05) ? '#ffffff' : '#141922'; }
+  {
+    const st = document.documentElement.style;
+    FAM_COLOR.forEach((c, f) => { st.setProperty('--f' + f, c); st.setProperty('--fi' + f, inkOn(c)); });
+    st.setProperty('--setup', SETUP_COLOR);
+  }
+  const C = {};
+  function readColors() {
+    const cs = getComputedStyle(document.documentElement);
+    for (const k of ['fg', 'muted', 'faint', 'line', 'surface', 'sunken', 'accent', 'accent-soft', 'up', 'down', 'bg', 'hl', 'setup-ink']) C[k] = cs.getPropertyValue('--' + k).trim();
+  }
+
+  // ---------- numbers and names ----------
+  function fmtPrice(v) {
+    if (v == null || !Number.isFinite(v)) return '–';
+    const a = Math.abs(v);
+    let s = Number(v.toPrecision(a >= 1 ? 12 : 10)).toString();
+    if (/e/i.test(s)) s = v.toFixed(Math.min(20, Math.max(0, 8 - Math.floor(Math.log10(a))))).replace(/0+$/, '').replace(/\.$/, '');
+    const neg = s.startsWith('-'); if (neg) s = s.slice(1);
+    const [i, f] = s.split('.');
+    return (neg ? '-' : '') + i.replace(/\B(?=(\d{3})+(?!\d))/g, ',') + (f ? '.' + f : '');
+  }
+  // a signed percent of a ratio difference: 0.0123 -> "+1.2%", -0.201 -> "−20.1%", 0 -> "0%"
+  function fmtPct(x) {
+    if (x == null || !Number.isFinite(x)) return '–';
+    if (x === 0) return '0%';
+    const a = Math.abs(x * 100), s = a >= 100 ? a.toFixed(0) : a >= 10 ? a.toFixed(1) : a >= 0.1 ? a.toFixed(1) : a.toFixed(2);
+    return (x < 0 ? '−' : '+') + s + '%';
+  }
+  function fmtCap(v) {
+    if (!(v > 0)) return '–';
+    const [d, u] = v >= 1e12 ? [1e12, 'T'] : v >= 1e9 ? [1e9, 'B'] : v >= 1e6 ? [1e6, 'M'] : [1e3, 'K'];
+    const x = v / d; return '$' + (x >= 100 ? x.toFixed(0) : x >= 10 ? x.toFixed(1) : x.toFixed(2)) + u;
+  }
+  const EX_NAME = { U: '업비트', B: '빗썸', N: '바이낸스' };
+  const exNames = (c) => ['U', 'B', 'N'].filter((x) => c.x.includes(x)).map((x) => EX_NAME[x]).join(' · ') || '업비트·빗썸·바이낸스 미상장(직접 추가한 종목)';
+  const nameOf = (c) => c.k || c.n;
+  const agoText = (ago) => (ago === 0 ? '마지막 봉' : ago + '봉 전');
+  const tvInterval = (tf) => { const m = /^(\d+)([DWM])$/.exec(tf); return (m[1] === '1' ? '' : m[1]) + m[2]; };
+  const tvUrl = (usd, tf) => `https://www.tradingview.com/chart/?symbol=${encodeURIComponent(usd)}&interval=${tvInterval(tf)}`;
+
+  // ---------- coins: hash slugs (ASCII letters and digits) ----------
+  const SLUG = new Map();
+  for (const c of COINS) { const s = c.s.toLowerCase(); if (/^[a-z0-9]+$/.test(s) && !SLUG.has(s)) { c.slug = s; SLUG.set(s, c); } }
+  for (const c of COINS) {
+    if (c.slug) continue;
+    let s = (c.usd || '').replace(/^[^:]*:/, '').replace(/USD$/i, '').toLowerCase().replace(/[^a-z0-9]+/g, '') || 'rank' + c.r;
+    while (SLUG.has(s)) s += 'x' + c.r;
+    c.slug = s; SLUG.set(s, c);
+  }
+  const coinBySlug = (s) => SLUG.get(String(s || '').toLowerCase()) || null;
+  const WITH_DATA = COINS.filter((c) => c.t);
+
+  // ---------- marks ----------
+  function chipHTML(kind, text, f) {
+    if (kind === 'C') return `<b class="k13" style="--c:var(--f${f});--i:var(--fi${f})">${esc(text)}</b>`;
+    if (kind === 'S') return `<b class="k9">${esc(text)}</b>`;
+    return `<b class="kd" style="--c:var(--f${f})">${esc(text)}</b>`;
+  }
+  function chipEl(kind, text, f) { const t = document.createElement('template'); t.innerHTML = chipHTML(kind, text, f); return t.content.firstChild; }
+
+  // ---------- tooltip ----------
+  const tipEl = $('tip');
+  const tip = {
+    show(x, y, content) {
+      if (typeof content === 'string') tipEl.innerHTML = content; else tipEl.replaceChildren(...content);
+      tipEl.style.display = 'block';
+      const pad = 14, w = tipEl.offsetWidth, h = tipEl.offsetHeight, vw = document.documentElement.clientWidth;
+      let px = x + pad, py = y + pad;
+      if (px + w > vw - 8) px = x - w - pad;
+      if (py + h > innerHeight - 8) py = y - h - pad;
+      tipEl.style.left = Math.max(8, Math.min(px, vw - w - 8)) + 'px'; tipEl.style.top = Math.max(8, Math.min(py, innerHeight - h - 8)) + 'px';
+    },
+    hide() { tipEl.style.display = 'none'; },
+  };
+
+  // ---------- canvas ----------
+  function setupCanvas(cv, w, h) {
+    const dpr = window.devicePixelRatio || 1;
+    cv.width = Math.max(1, Math.round(w * dpr)); cv.height = Math.max(1, Math.round(h * dpr)); cv.style.width = w + 'px'; cv.style.height = h + 'px';
+    const ctx = cv.getContext('2d'); ctx.setTransform(dpr, 0, 0, dpr, 0, 0); return ctx;
+  }
+  // label pad as the script computes it: max(ATR14 (Wilder), mintick * 10) * spacing, high - low before ATR exists
+  function padArray(bars, mintick) {
+    const n = bars.n, H = bars.h, L = bars.l, Cl = bars.c, out = new Float64Array(n);
+    let sum = 0, atr = NaN;
+    for (let i = 0; i < n; i++) {
+      const tr = i === 0 ? H[i] - L[i] : Math.max(H[i] - L[i], Math.abs(H[i] - Cl[i - 1]), Math.abs(L[i] - Cl[i - 1]));
+      if (i < 14) { sum += tr; if (i === 13) atr = sum / 14; } else atr = (atr * 13 + tr) / 14;
+      out[i] = Math.max(Number.isNaN(atr) ? H[i] - L[i] : atr, mintick * 10) * OPT.spacing;
+    }
+    return out;
+  }
+  // the price the script puts a label at (f_emitLabel y)
+  function labelPrice(L, bars, pad) {
+    const i = L.bar, lo = bars.l[i], hi = bars.h[i], p = pad[i];
+    if (L.kind === 'S') return L.dir === BUY ? lo - p * 0.5 : hi + p * 0.5;
+    if (L.kind === 'C') { const base = L.dir === BUY ? lo : hi, safe = Math.min(p, Math.abs(base) * 0.06 / 8); return base + L.dir * safe * (2 + L.family * 2); }
+    if (L.kind === 'I') return (L.dir === BUY ? lo : hi) + L.dir * p * (1.5 + L.family * 1.5);
+    return L.dir === BUY ? lo - p : hi + p;
+  }
+  const labelColor = (L) => (L.kind === 'S' ? SETUP_COLOR : FAM_COLOR[L.family]);
+  const LABEL_FONT = { large: '600 15px "IBM Plex Sans KR", sans-serif', small: '500 11px "IBM Plex Sans KR", sans-serif', tiny: '600 9.5px "IBM Plex Sans KR", sans-serif', normal: '500 12px "IBM Plex Sans KR", sans-serif' };
+  // tick labels for a list of bar start days placed by index: years, quarters or months, at least ~64px apart
+  function dateTicks(days, px) {
+    const N = days.length; if (!N) return [];
+    const span = days[N - 1] - days[0], out = [];
+    const keyOf = span > 365 * 3 ? (d) => new Date(d * DAY).getUTCFullYear()
+      : span > 200 ? (d) => { const t = new Date(d * DAY); return t.getUTCFullYear() * 4 + Math.floor(t.getUTCMonth() / 3); }
+        : (d) => { const t = new Date(d * DAY); return t.getUTCFullYear() * 12 + t.getUTCMonth(); };
+    const label = span > 365 * 3 ? (d) => String(new Date(d * DAY).getUTCFullYear()) : (d) => iso(d).slice(0, 7);
+    let lastX = -Infinity;
+    for (let i = 1; i < N; i++) {
+      if (keyOf(days[i]) === keyOf(days[i - 1])) continue;
+      const x = (i + 0.5) / N * px; if (x - lastX < 64 || x < 24 || x > px - 24) continue;
+      out.push({ i, label: label(days[i]) }); lastX = x;
+    }
+    return out;
+  }
+
+  // ---------- shared state, kept in localStorage when it is there ----------
+  const VIEWS = [['market', '시장 조감도'], ['sheet', '여러 TF 한 장'], ['ladder', 'TF 사다리']];
+  const state = { view: 'market', key: 'a', keys: { market: 'a', sheet: 'a', ladder: 'a' }, coin: 'btc', fam: FAMS.slice(), v: {} };
+  try {
+    const s = JSON.parse(localStorage.getItem('td-birdeye') || '{}');
+    if (s.keys) for (const [v] of VIEWS) if (s.keys[v] === 'a' || s.keys[v] === 'b') state.keys[v] = s.keys[v];
+    if (typeof s.coin === 'string' && coinBySlug(s.coin)) state.coin = s.coin;
+    if (Array.isArray(s.fam)) state.fam = s.fam.filter((f) => FAMS.includes(f));
+    if (s.v && typeof s.v === 'object') state.v = s.v;
+  } catch (e) { /* no storage: defaults */ }
+  if (!coinBySlug(state.coin)) state.coin = (WITH_DATA[0] || COINS[0]).slug;
+  function save() { try { localStorage.setItem('td-birdeye', JSON.stringify({ keys: state.keys, coin: state.coin, fam: state.fam, v: state.v })); } catch (e) { /* ignore */ } }
+  function vstate(id, defaults) { const o = state.v[id] && typeof state.v[id] === 'object' ? state.v[id] : {}; state.v[id] = { ...defaults, ...o }; return state.v[id]; }
+  const famOn = (f) => state.fam.includes(f);
+  const coin = () => coinBySlug(state.coin);
+
+  // ---------- summary level: every coin, from the build ----------
+  const SIDES = new Map();
+  function side(c, j, dir) {
+    const T = c.t && c.t[j]; if (!T) return null;
+    const key = c.slug + '|' + j + '|' + dir;
+    let s = SIDES.get(key);
+    if (!s) { s = VIEW.sideState(TD.evalTrigger, T, dir, c.lc, OPT); SIDES.set(key, s); }
+    return s;
+  }
+
+  // ---------- detail level: one coin, recounted in the browser from its daily data ----------
+  const staleError = (msg) => Object.assign(new Error(msg), { stale: true });
+  const CHUNKS = new Map();
+  function loadChunk(ch) {
+    if (!CHUNKS.has(ch)) {
+      const p = fetch(`d/${ch}.json?v=${encodeURIComponent(DATA.build)}`)
+        .then((r) => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); })
+        .then((j) => { if (j.build !== DATA.build) throw staleError(`빌드 ${j.build}`); return j.daily; });
+      p.catch(() => CHUNKS.delete(ch));
+      CHUNKS.set(ch, p);
+      if (CHUNKS.size > 16) CHUNKS.delete(CHUNKS.keys().next().value);
+    }
+    return CHUNKS.get(ch);
+  }
+  // syminfo.mintick is not in the data: the smallest price step seen in the recent closes
+  function estimateMintick(d) {
+    let dec = 0;
+    for (let i = d.c.length - 1, k = 0; i >= 0 && k < 400; i--) {
+      const v = d.c[i]; if (v == null) continue; k++;
+      const s = String(v), m = /e-(\d+)$/.exec(s), frac = (s.split('e')[0].split('.')[1] || '').length;
+      dec = Math.max(dec, m ? Number(m[1]) + frac : frac);
+    }
+    return Math.pow(10, -Math.min(dec, 12));
+  }
+  const DETAILS = new Map();
+  function buildDetail(c, daily) {
+    const d = daily && daily[c.usd]; if (!d) throw staleError(`${c.usd} 없음`);
+    let z = Math.min(d.c.length - 1, LAST - d.d0); while (z >= 0 && d.c[z] == null) z--;
+    const last = z >= 0 ? d.c[z] : NaN, mintick = estimateMintick(d);
+    const tfs = TFS.map((tf, j) => {
+      const bars = BARS.buildBars(d, tf, LAST);
+      const res = bars.n ? TD.runTD(bars, OPT) : null;
+      const base = VIEW.baseBar(bars.partial, last);
+      const trigs = res ? VIEW.withFire(TD.evalTrigger, TD.nextBarTriggers(bars, res, OPT), base) : [];
+      const runs = res ? res.state.runs.map((r) => ({ family: r.family, direction: r.direction, n: r.n, originBar: r.originBar, originDay: bars.start[r.originBar], ageBars: bars.n - 1 - r.originBar })) : [];
+      let pad = null, byBar = null;
+      return { tf, j, bars, res, base, trigs, runs,
+        pad() { return pad || (pad = padArray(bars, mintick)); },
+        byBar() { if (!byBar) { byBar = new Map(); if (res) res.labels.forEach((L, k) => { let a = byBar.get(L.bar); if (!a) byBar.set(L.bar, a = []); a.push(k); }); } return byBar; } };
+    });
+    return { c, d, mintick, last, tfs };
+  }
+  function detail(c) {
+    if (!c || !c.usd || !c.t) return Promise.reject(new Error(c && c.usd ? `${c.usd}의 데이터가 없습니다` : 'TradingView USD 티커가 없습니다'));
+    if (!DETAILS.has(c.slug)) {
+      const p = loadChunk(c.ch).then((daily) => buildDetail(c, daily));
+      p.catch(() => DETAILS.delete(c.slug));
+      DETAILS.set(c.slug, p);
+      if (DETAILS.size > 8) DETAILS.delete(DETAILS.keys().next().value);
+    }
+    return DETAILS.get(c.slug);
+  }
+
+  // ---------- controls ----------
+  // a labelled segmented control: options [[value, text], ...]; get() the current value; set(value) on a click
+  function seg(label, options, get, set, cls) {
+    const wrap = el('div', 'ctl'), id = 'lb-' + Math.random().toString(36).slice(2, 8);
+    if (label) { const s = el('span', null, label); s.id = id; wrap.append(s); }
+    const g = el('div', 'seg' + (cls ? ' ' + cls : '')); g.setAttribute('role', 'group'); if (label) g.setAttribute('aria-labelledby', id);
+    const sync = () => g.querySelectorAll('button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.v === String(get()))));
+    for (const [v, text] of options) { const b = el('button', null, text); b.type = 'button'; b.dataset.v = String(v); b.addEventListener('click', () => { set(v); sync(); }); g.append(b); }
+    sync(); wrap.append(g); wrap.sync = sync;
+    return wrap;
+  }
+
+  // ---------- variants, routing ----------
+  const VARIANTS = new Map();
+  function register(v) { VARIANTS.set(v.view + '-' + v.key, v); }
+  let ACTIVE = null, ROOT = null;
+  const hashOf = (view, key, slug) => `#${view}-${key}` + (view !== 'market' && slug ? `-${slug}` : '');
+  function go(to) {
+    const view = to.view || state.view, key = to.key || (to.view && to.view !== state.view ? state.keys[view] : state.key), slug = to.coin || state.coin;
+    const h = hashOf(view, key, slug);
+    if (location.hash === h) route(); else location.hash = h;
+  }
+  const openCoin = (slug, view = 'sheet') => go({ view, coin: slug });
+  function renderActive(why) { if (ACTIVE && ROOT) { try { ACTIVE.render(why); } catch (e) { console.error(e); ROOT.replaceChildren(el('div', 'empty', `이 시안을 그리다가 오류가 났습니다: ${e.message}`)); } } }
+  function route() {
+    const m = /^#(market|sheet|ladder)(?:-([ab]))?(?:-([a-z0-9]+))?$/.exec(location.hash.toLowerCase());
+    const before = state.coin;
+    if (m) { state.view = m[1]; if (m[2]) state.keys[m[1]] = m[2]; if (m[3] && coinBySlug(m[3])) state.coin = m[3]; }
+    state.key = state.keys[state.view];
+    save();
+    const next = VARIANTS.get(state.view + '-' + state.key) || null;
+    syncShell();
+    if (next !== ACTIVE) {
+      tip.hide();
+      if (ACTIVE && ACTIVE.unmount) { try { ACTIVE.unmount(); } catch (e) { console.error(e); } }
+      ACTIVE = next;
+      ROOT = el('div'); ROOT.id = 'stage-root'; ROOT.style.cssText = 'display:grid;gap:12px;min-width:0;grid-template-columns:minmax(0,1fr)';
+      $('stage').replaceChildren(ROOT);
+      if (!ACTIVE) { ROOT.append(el('div', 'panel empty', '이 시안은 아직 준비되지 않았습니다.')); return; }
+      try { ACTIVE.mount(ROOT); } catch (e) { console.error(e); ROOT.replaceChildren(el('div', 'panel empty', `이 시안을 여는 중에 오류가 났습니다: ${e.message}`)); return; }
+      renderActive('mount');
+      window.scrollTo({ top: 0 });
+    } else if (before !== state.coin) renderActive('coin');
+  }
+  function syncShell() {
+    const c = coin(), perCoin = state.view !== 'market';
+    for (const a of $('tabs').children) {
+      const v = a.dataset.view;
+      a.setAttribute('aria-current', v === state.view ? 'page' : 'false');
+      a.href = hashOf(v, state.keys[v], state.coin);
+    }
+    const vs = $('varSeg'); vs.replaceChildren();
+    for (const key of ['a', 'b']) {
+      const v = VARIANTS.get(state.view + '-' + key);
+      const b = el('button', null, `${key.toUpperCase()} · ${v ? v.name : '준비 중'}`); b.type = 'button';
+      b.setAttribute('aria-pressed', String(key === state.key));
+      b.addEventListener('click', () => go({ view: state.view, key }));
+      vs.append(b);
+    }
+    $('coinCtl').hidden = !perCoin;
+    const note = $('vnote'), v = VARIANTS.get(state.view + '-' + state.key); note.replaceChildren();
+    if (v) {
+      const h = el('h2', null, `시안 ${state.key.toUpperCase()} · ${v.name}`); h.append(el('small', null, VIEWS.find((x) => x[0] === state.view)[1]));
+      const p = el('p'); p.innerHTML = v.blurb || '';
+      note.append(h, p);
+      if ((v.good && v.good.length) || (v.weak && v.weak.length)) {
+        const pc = el('div', 'pc');
+        if (v.good && v.good.length) { const s = el('span'); s.append(el('b', null, '좋은 점 '), document.createTextNode(v.good.join(' · '))); pc.append(s); }
+        if (v.weak && v.weak.length) { const s = el('span'); s.append(el('b', null, '아쉬운 점 '), document.createTextNode(v.weak.join(' · '))); pc.append(s); }
+        note.append(pc);
+      }
+    }
+    const head = $('coinHead'); head.hidden = !perCoin; head.replaceChildren();
+    if (perCoin && c) {
+      head.append(el('h1', null, c.s), el('span', 'nm', c.k ? `${c.k} · ${c.n}` : c.n));
+      const meta = el('div', 'meta');
+      meta.append(el('span', null, `시가총액 ${c.r}위 ${fmtCap(c.mc)}`), el('span', null, exNames(c)));
+      if (c.lc != null) meta.append(el('span', 'num', `최근 종가 ${fmtPrice(c.lc)} (${DATA.lastClosedDay} 마감)`));
+      if (c.usd) { const a = el('a', null, 'TradingView 차트 ↗'); a.href = tvUrl(c.usd, '1D'); a.target = '_blank'; a.rel = 'noopener'; meta.append(a); }
+      head.append(meta);
+      $('coinInput').value = '';
+      $('coinInput').placeholder = `${c.s} · 심볼 검색`;
+      const i = WITH_DATA.indexOf(c);
+      $('prevCoin').disabled = i <= 0; $('nextCoin').disabled = i < 0 || i >= WITH_DATA.length - 1;
+      for (const b of $('quick').children) b.setAttribute('aria-pressed', String(b.dataset.slug === c.slug));
+    }
+    $('famSeg').querySelectorAll('button').forEach((b) => b.setAttribute('aria-pressed', String(famOn(Number(b.dataset.fam)))));
+  }
+  function start() {
+    readColors();
+    $('asof').textContent = `${DATA.lastClosedDay} 마감 · 실제 데이터`;
+    $('lead').textContent = `Bird eye 화면의 시안입니다. 세 가지 화면을 두 가지 방식씩 만들었습니다. 모든 숫자는 실제 데이터(${DATA.lastClosedDay} 마감 봉까지)를 TD Research v6 기본 설정으로 센 값이고, 사이트와 같은 엔진을 씁니다. 화면마다 시안 A와 B를 바꿔 보시고, 마음에 드는 쪽과 고칠 점을 알려 주세요.`;
+    const tabs = $('tabs');
+    for (const [v, name] of VIEWS) { const a = el('a', null, name); a.dataset.view = v; tabs.append(a); }
+    const dl = $('coinList');
+    for (const c of WITH_DATA) { const o = el('option'); o.value = c.s; o.label = `${c.r}위 ${nameOf(c)}`; dl.append(o); }
+    const pick = (text) => {
+      const q = String(text || '').trim().toLowerCase(); if (!q) return;
+      const c = WITH_DATA.find((x) => x.s.toLowerCase() === q) || WITH_DATA.find((x) => (x.k || '').toLowerCase() === q || x.n.toLowerCase() === q) || WITH_DATA.find((x) => x.s.toLowerCase().startsWith(q));
+      if (c) go({ coin: c.slug });
+    };
+    $('coinInput').addEventListener('change', (e) => pick(e.target.value));
+    $('coinInput').addEventListener('keydown', (e) => { if (e.key === 'Enter') { pick(e.target.value); e.target.blur(); } });
+    const step = (k) => { const i = WITH_DATA.indexOf(coin()); const c = WITH_DATA[i + k]; if (c) go({ coin: c.slug }); };
+    $('prevCoin').addEventListener('click', () => step(-1));
+    $('nextCoin').addEventListener('click', () => step(1));
+    for (const s of ['btc', 'eth', 'xrp', 'sol', 'doge', 'pepe']) {
+      const c = coinBySlug(s); if (!c || !c.t) continue;
+      const b = el('button', null, c.s); b.type = 'button'; b.dataset.slug = c.slug; b.addEventListener('click', () => go({ coin: c.slug })); $('quick').append(b);
+    }
+    const fs = $('famSeg');
+    for (const f of FAMS) {
+      const b = el('button'); b.type = 'button'; b.dataset.fam = f; b.title = TD.FAMILY_NAMES[f];
+      const i = el('i'); i.style.background = `var(--f${f})`; b.append(i, document.createTextNode(FAM_NAME[f]));
+      b.addEventListener('click', () => { state.fam = famOn(f) ? state.fam.filter((x) => x !== f) : [...state.fam, f].sort(); save(); syncShell(); renderActive('fam'); });
+      fs.append(b);
+    }
+    addEventListener('hashchange', route);
+    let rt = 0, lastW = innerWidth;
+    addEventListener('resize', () => { clearTimeout(rt); rt = setTimeout(() => { if (innerWidth === lastW) return; lastW = innerWidth; tip.hide(); renderActive('resize'); }, 140); });
+    const retheme = () => { readColors(); renderActive('theme'); };
+    try { matchMedia('(prefers-color-scheme: dark)').addEventListener('change', retheme); } catch (e) { /* old browsers */ }
+    new MutationObserver(retheme).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+    if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => renderActive('theme'));
+    addEventListener('scroll', () => tip.hide(), { passive: true });
+    route();
+    try { performance.mark('be-ready'); } catch (e) { /* no performance API */ }
+  }
+
+  return { DATA, TFS, OPT, LAST, DAY, COINS, WITH_DATA, FAMS, FAM_NAME, FAM_CODE, FAM_COLOR, SETUP_COLOR, BUY, SELL, SIDE, ARROW, C,
+    el, esc, iso, nf, fmtPrice, fmtPct, fmtCap, exNames, nameOf, agoText, tvUrl, chipHTML, chipEl, tip, setupCanvas, padArray, labelPrice,
+    labelColor, LABEL_FONT, dateTicks, seg, state, save, vstate, famOn, coin, coinBySlug, side, detail, register, go, openCoin, start };
+})();
+</script>
+<script>/*__INCLUDE:be-market-a.js__*/</script>
+<script>/*__INCLUDE:be-market-b.js__*/</script>
+<script>/*__INCLUDE:be-sheet-a.js__*/</script>
+<script>/*__INCLUDE:be-sheet-b.js__*/</script>
+<script>/*__INCLUDE:be-ladder-a.js__*/</script>
+<script>/*__INCLUDE:be-ladder-b.js__*/</script>
+<script>BE.start();</script>

@@ -10,9 +10,16 @@
 //
 // Output (default dist/site): index.html, b.json, d/0.json, d/1.json, ...
 // Usage: node scripts/build-site.mjs [outDir] [--daily-dir data/daily] [--chunk 3] [--fragment] [--template file]
-//   --chunk     coins per daily file (default 3, so the site stays under the artifact viewer's 256-file limit)
-//   --fragment  writes index.html without the document around it
-//   --template  page template with the same markers (default dashboard/screener.html), e.g. for design studies
+//                                    [--page-only]
+//   --chunk      coins per daily file (default 3, so the site stays under the artifact viewer's 256-file limit)
+//   --fragment   writes index.html without the document around it
+//   --template   page template with the same markers (default dashboard/screener.html), e.g. for design studies.
+//                A template may pull in files next to it: /*__INCLUDE:file__*/ becomes the file's text, and
+//                /*__MODULE:NAME:file__*/ an ES module as `const NAME = (() => {...})();`, like BARS and TD
+//   --page-only  rewrites index.html only and keeps the b.json and d/ files already in outDir (same data, same
+//                --chunk), for quick rebuilds while a page is being worked on
+//   --includes   comma-separated file names without extension: of the template's /*__INCLUDE:file__*/ markers only
+//                these are filled in, the others stay empty (to build a page with some of its parts)
 import { readFile, writeFile, mkdir, rm, readdir } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
 import path from 'node:path';
@@ -25,6 +32,8 @@ const DAILY_DIR = opt('--daily-dir', path.join('data', 'daily'));
 const CHUNK = Number(opt('--chunk', 3));
 const FRAGMENT = args.includes('--fragment');
 const TEMPLATE = opt('--template', path.join('dashboard', 'screener.html'));
+const PAGE_ONLY = args.includes('--page-only');
+const INCLUDES = opt('--includes', null)?.split(',').map((x) => x.trim()).filter(Boolean) ?? null;
 const OUT = args.find((a) => !a.startsWith('--')) || path.join('dist', 'site');
 if (!(CHUNK >= 1)) throw new Error('--chunk must be a positive number');
 const RECENT = 12;          // labels kept in the summary: on the last RECENT + 1 confirmed bars (DeMARK's 12-bar window)
@@ -34,7 +43,7 @@ const iso = (d) => new Date(d * DAY).toISOString().slice(0, 10);
 const universe = JSON.parse(await readFile(path.join('data', 'universe.json'), 'utf8'));
 const tickers = JSON.parse(await readFile(path.join('data', 'tickers.json'), 'utf8'));
 const status = JSON.parse(await readFile(path.join(DAILY_DIR, '_status.json'), 'utf8'));
-const template = await readFile(TEMPLATE, 'utf8');
+const templateRaw = await readFile(TEMPLATE, 'utf8');
 const barsSrc = await readFile(path.join('dashboard', 'bars.js'), 'utf8');
 const engineSrc = await readFile(path.join('dashboard', 'td-engine.js'), 'utf8');
 const lastClosedDay = Date.parse(`${status.lastClosedDay}T00:00:00Z`) / DAY;
@@ -150,16 +159,24 @@ coins.forEach((c, i) => { c.coin.r = i + 1; });
 
 const layout = createHash('sha1').update(JSON.stringify([CHUNK, byChunk.map((c) => [c.coin.ch, c.coin.usd, c.daily?.d0 ?? null])])).digest('hex');
 const build = `${status.fetchedAt.replace(/\D/g, '').slice(0, 14)}-${layout.slice(0, 8)}`;
-await rm(OUT, { recursive: true, force: true });
-await mkdir(path.join(OUT, 'd'), { recursive: true });
 const nChunks = Math.ceil(byChunk.length / CHUNK);
-for (let ch = 0; ch < nChunks; ch++) {
-  const daily = {};
-  for (const c of byChunk.slice(ch * CHUNK, (ch + 1) * CHUNK)) if (c.daily) daily[c.coin.usd] = c.daily;
-  await writeFile(path.join(OUT, 'd', `${ch}.json`), JSON.stringify({ build, daily }));
+// --page-only keeps the data files of an earlier build of the same data and layout (their build id says so)
+let keepData = false;
+if (PAGE_ONLY) {
+  try { keepData = JSON.parse(await readFile(path.join(OUT, 'b.json'), 'utf8')).build === build && (await readdir(path.join(OUT, 'd'))).length === nChunks; } catch {}
+  if (!keepData) console.log(`--page-only: ${OUT} has no data files of build ${build}; writing them`);
 }
-const series = Object.fromEntries(TFS.map((tf) => [tf, [...breadth[tf].values()].sort((a, b) => a[0] - b[0])]));
-await writeFile(path.join(OUT, 'b.json'), JSON.stringify({ build, cols: ['day', 'coins', 'b9', 's9', 'b9r', 's9r', 'b13S', 'b13AS', 'b13C', 'b13AC', 's13S', 's13AS', 's13C', 's13AC'], series }));
+if (!keepData) {
+  await rm(OUT, { recursive: true, force: true });
+  await mkdir(path.join(OUT, 'd'), { recursive: true });
+  for (let ch = 0; ch < nChunks; ch++) {
+    const daily = {};
+    for (const c of byChunk.slice(ch * CHUNK, (ch + 1) * CHUNK)) if (c.daily) daily[c.coin.usd] = c.daily;
+    await writeFile(path.join(OUT, 'd', `${ch}.json`), JSON.stringify({ build, daily }));
+  }
+  const series = Object.fromEntries(TFS.map((tf) => [tf, [...breadth[tf].values()].sort((a, b) => a[0] - b[0])]));
+  await writeFile(path.join(OUT, 'b.json'), JSON.stringify({ build, cols: ['day', 'coins', 'b9', 's9', 'b9r', 's9r', 'b13S', 'b13AS', 'b13C', 'b13AC', 's13S', 's13AS', 's13C', 's13AC'], series }));
+}
 
 let verify = null;
 try { verify = JSON.parse(await readFile(path.join('verify', 'out', 'summary.json'), 'utf8')); } catch {}
@@ -170,8 +187,7 @@ const data = JSON.stringify({
   verify, checks, coins: coins.map((c) => c.coin),
 });
 
-for (const marker of ['/*__DATA__*/null', '/*__BARS__*/', '/*__ENGINE__*/']) if (!template.includes(marker)) throw new Error(`template is missing ${marker}`);
-// Each module becomes `const NAME = (() => { ...; return { exports } })();` inside the page, so the two modules keep
+// Each module becomes `const NAME = (() => { ...; return { exports } })();` inside the page, so the modules keep
 // their own scopes; '<' in the data is escaped so no name in it can close the inline script.
 function inlineModule(name, src) {
   const exported = [...src.matchAll(/^export\s+(?:async\s+)?(?:function\*?|const|let|var|class)\s+([A-Za-z_$][\w$]*)/gm)].map((m) => m[1]);
@@ -179,6 +195,20 @@ function inlineModule(name, src) {
   if (/^import\s/m.test(src)) throw new Error(`${name}: imports cannot be inlined`);
   return `const ${name} = (() => {\n${src.replace(/^export\s+/gm, '')}\nreturn { ${exported.join(', ')} };\n})();`;
 }
+// files a template pulls in, relative to its own folder (a file is not searched for markers itself)
+async function expandIncludes(tpl) {
+  const dir = path.dirname(TEMPLATE), parts = tpl.split(/\/\*__(INCLUDE|MODULE):([^*]+?)__\*\//);
+  let out = parts[0];
+  for (let i = 1; i < parts.length; i += 3) {
+    const kind = parts[i], arg = parts[i + 1];
+    if (kind === 'INCLUDE') { if (!INCLUDES || INCLUDES.includes(path.basename(arg, path.extname(arg)))) out += await readFile(path.join(dir, arg), 'utf8'); }
+    else { const k = arg.indexOf(':'); if (k < 1) throw new Error(`bad module marker ${arg}`); out += inlineModule(arg.slice(0, k), await readFile(path.join(dir, arg.slice(k + 1)), 'utf8')); }
+    out += parts[i + 2];
+  }
+  return out;
+}
+const template = await expandIncludes(templateRaw);
+for (const marker of ['/*__DATA__*/null', '/*__BARS__*/', '/*__ENGINE__*/']) if (!template.includes(marker)) throw new Error(`template is missing ${marker}`);
 const body = template.replace('/*__BARS__*/', () => inlineModule('BARS', barsSrc)).replace('/*__ENGINE__*/', () => inlineModule('TD', engineSrc))
   .replace('/*__DATA__*/null', () => data.replace(/</g, '\\u003c'));
 const cut = body.indexOf('<header');
