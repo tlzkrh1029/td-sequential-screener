@@ -10,7 +10,7 @@
 //
 // Output (default dist/site): index.html, b.json, d/0.json, d/1.json, ...
 // Usage: node scripts/build-site.mjs [outDir] [--daily-dir data/daily] [--chunk 3] [--fragment] [--template file]
-//                                    [--page-only]
+//                                    [--page-only] [--includes name,name] [--coins SYM,SYM]
 //   --chunk      coins per daily file (default 3, so the site stays under the artifact viewer's 256-file limit)
 //   --fragment   writes index.html without the document around it
 //   --template   page template with the same markers (default dashboard/screener.html), e.g. for design studies.
@@ -20,6 +20,10 @@
 //                --chunk), for quick rebuilds while a page is being worked on
 //   --includes   comma-separated file names without extension: of the template's /*__INCLUDE:file__*/ markers only
 //                these are filled in, the others stay empty (to build a page with some of its parts)
+//   --coins      comma-separated coin symbols (letter case ignored): the page data and the daily files hold only
+//                these coins (a page for a few coins, e.g. a study; b.json then counts these coins only). A coin keeps
+//                its market-cap rank among all coins of the universe. A symbol that is not in data/universe.json or
+//                has no TradingView data is an error.
 import { readFile, writeFile, mkdir, rm, readdir } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
 import path from 'node:path';
@@ -34,6 +38,7 @@ const FRAGMENT = args.includes('--fragment');
 const TEMPLATE = opt('--template', path.join('dashboard', 'screener.html'));
 const PAGE_ONLY = args.includes('--page-only');
 const INCLUDES = opt('--includes', null)?.split(',').map((x) => x.trim()).filter(Boolean) ?? null;
+const COINS = args.includes('--coins') ? (opt('--coins') ?? '').split(',').map((x) => x.trim()).filter(Boolean) : null;
 const OUT = args.find((a) => !a.startsWith('--')) || path.join('dist', 'site');
 if (!(CHUNK >= 1)) throw new Error('--chunk must be a positive number');
 const RECENT = 12;          // labels kept in the summary: on the last RECENT + 1 confirmed bars (DeMARK's 12-bar window)
@@ -118,14 +123,28 @@ function addChecks(coin, tf, bars, res) {
   }
 }
 
+// --coins: the universe entries of the symbols asked for
+let only = null;
+if (COINS) {
+  if (!COINS.length) throw new Error('--coins needs at least one coin symbol');
+  const bySym = new Map(universe.coins.map((u) => [u.sym.toLowerCase(), u]));
+  only = new Set(COINS.map((sym) => {
+    const u = bySym.get(sym.toLowerCase());
+    if (!u) throw new Error(`--coins: no coin with the symbol ${sym} in data/universe.json`);
+    return u;
+  }));
+}
+
 const byTicker = new Map(tickers.coins.map((t) => [t.sym, t]));
 const coins = [];
 const checkSyms = new Set([...universe.coins].sort((a, b) => (b.mcap || 0) - (a.mcap || 0)).slice(0, CHECK_COINS).map((u) => u.sym));
 let labels = 0, runs = 0;
 const t0 = Date.now();
 for (const u of universe.coins) {
+  if (only && !only.has(u)) continue;
   const t = byTicker.get(u.sym) || {};
   const daily = t.usd ? await load(t.usd) : null;
+  if (only && !daily) throw new Error(`--coins: ${u.sym} has no TradingView data (${t.usd ? `no usable file for ${t.usd} in ${DAILY_DIR}` : 'no USD ticker in data/tickers.json'})`);
   const coin = { r: 0, s: u.sym, n: u.name, k: u.ko || null, x: u.ex || '', mc: Math.round(u.mcap || 0), usd: t.usd || null, tv: t.tvName || null };
   if (daily) {
     let a = 0; while (a < daily.c.length && daily.c[a] == null) a++;
@@ -156,6 +175,12 @@ coins.forEach((c, i) => { c.coin.ch = Math.floor(i / CHUNK); });
 const byChunk = coins.slice();
 coins.sort((a, b) => b.coin.mc - a.coin.mc);
 coins.forEach((c, i) => { c.coin.r = i + 1; });
+if (only) {
+  // the rank among all coins of the universe, in the order the lines above give when every coin is built
+  const all = universe.coins.map((u) => ({ sym: u.sym, mc: Math.round(u.mcap || 0) })).sort((a, b) => b.mc - a.mc);
+  const rank = new Map(all.map((u, i) => [u.sym, i + 1]));
+  for (const c of coins) c.coin.r = rank.get(c.coin.s);
+}
 
 const layout = createHash('sha1').update(JSON.stringify([CHUNK, byChunk.map((c) => [c.coin.ch, c.coin.usd, c.daily?.d0 ?? null])])).digest('hex');
 const build = `${status.fetchedAt.replace(/\D/g, '').slice(0, 14)}-${layout.slice(0, 8)}`;
