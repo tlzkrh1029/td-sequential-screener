@@ -424,12 +424,12 @@
     drawNames(k, am);
     if (am) drawActive(k, P[am.id]);
     ui.cv.setAttribute('aria-label', ariaText());
-    if (geo.fresh) {   // once per layout, for tests: where each mark stands in the picture (canvas px)
+    if (geo.fresh) {   // once per layout, for tests: where each mark stands in the picture (canvas px) and what is written next to it
       geo.fresh = false;
       const r1 = (v) => Math.round(v * 10) / 10;
       ui.cv.dataset.geo = JSON.stringify({ coin: cur.c.slug, turned: geo.turned, W: geo.W, H: geo.H, dc: geo.dc, half: geo.half, span: geo.span, R: geo.R, cs: r1(geo.cs), cells: BE.TFS.map((tf, j) => r1(geo.cell(j))) });
       ui.cv.dataset.marks = JSON.stringify(P.map((p) => [p.m.id, p.m.tf, markText(p.m), p.m.f, p.m.d,
-        p.off ? 'arrow' : p.m.fire.now ? 'dot' : p.small ? 'bar' : p.host ? 'with' : 'chip', r1(p.box.x), r1(p.box.y), r1(p.box.w), r1(p.box.h)]));
+        p.off ? 'arrow' : p.m.fire.now ? 'dot' : p.small ? 'bar' : p.host ? 'with' : 'chip', r1(p.box.x), r1(p.box.y), r1(p.box.w), r1(p.box.h), p.note || null, p.times || null, p.m.fire.now ? !!p.tag : null]));
     }
   }
   // the cells: strips beyond the range, the 임박 zone, the cell of the highlighted mark, grid lines, frames
@@ -463,11 +463,11 @@
   // per timeframe: what the bar in progress has touched so far, as a slim bar at the cell's first edge (the lanes
   // begin after it); then the line of the current price over all of them
   function drawBars(k) {
-    const { g, ctx, C, F, T, D, snap, pt, box, fill, seg, dark } = k;
+    const { g, ctx, C, F, T, D, snap, pt, box, fill, seg } = k;
     for (const x of cur.det.tfs) {
       if (!x.bars.n || x.base.assumed || !(x.base.c > 0)) continue;
       const lo = x.base.l / x.base.c - 1, hi = x.base.h / x.base.c - 1, a = g.cell(x.j) + 1.5;
-      ctx.fillStyle = C.muted; ctx.globalAlpha = dark ? 0.42 : 0.3; fill(box(a, D(lo), a + 2, D(hi)));
+      ctx.fillStyle = C.muted; ctx.globalAlpha = 0.3; fill(box(a, D(lo), a + 2, D(hi)));
     }
     ctx.globalAlpha = 1;
     ctx.strokeStyle = C.fg; ctx.lineWidth = 1.25; seg(g.a0 - 4, snap(g.dc), g.a1 + 4, snap(g.dc)); ctx.lineWidth = 1;
@@ -563,6 +563,7 @@
         const w = Math.max(3, p.L.size * 0.4);
         ctx.globalAlpha = 1; ctx.lineWidth = 1.5; seg(a - w, snap(p.dQ), a + w, snap(p.dQ));
         p.qbox = box(a - w, p.dQ - 0.75, a + w, p.dQ + 0.75);
+        taken.push(grown(p.qbox, 1));   // no text goes over the tick of a close level
         hit(p.m.id, box(a - Math.max(w, p.L.size / 2), p.dQ - 1, a + Math.max(w, p.L.size / 2), p.dQ + 1), T ? 3 : 0, T ? 0 : 3);
       }
     }
@@ -594,21 +595,26 @@
       ctx.globalAlpha = p.a; ctx.fillStyle = p.col; ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.fill(); ctx.globalAlpha = 1;
       const dot = { x: cx - r, y: cy - r, w: 2 * r, h: 2 * r };
       taken.push(grown(dot, 1));
-      for (const q of list) { q.box = dot; q.n = list.length; hit(q.m.id, dot, 3, 3); }
+      for (const q of list) { q.box = dot; hit(q.m.id, dot, 3, 3); }
     }
     for (const list of nows.values()) {
       const p = list[0], r = p.box.w / 2, b = chipBox(p, g.dc + 0.5 + p.out * (r + 2.5 + (T ? CW[markText(p.m)] : CHIP_H) / 2));
-      if (taken.some((t, i) => i > 0 && overlaps(b, t) && !overlaps(grown(p.box, 0.5), t))) continue;   // its own dot is no obstacle
+      if (taken.some((t) => overlaps(b, t))) continue;   // no room (its own dot ends before the chip begins)
       drawChip(b, p, 2); taken.push(grown(b, 1));
       for (const q of list) { q.tag = b; hit(q.m.id, b, 1, 1); }
     }
     // a text next to its anchor, on the first of the given sides (1 = towards larger d) that is free and inside the
-    // range; lim = [from, to]: where the text has to stay along the timeframes
-    const put = (txt, font, h, anchor, sides, gap, color, alpha, id, lim) => {
+    // range; lim = [from, to]: where the text has to stay along the timeframes. With `across` (the picture turned,
+    // where a text beside its chip may run into a close tick) it may also stand under or over the anchor in its row.
+    const put = (txt, font, h, anchor, sides, gap, color, alpha, id, lim, across) => {
       ctx.font = font;
       const w = ctx.measureText(txt).width, cx = anchor.x + anchor.w / 2, cy = anchor.y + anchor.h / 2;
-      for (const o of sides) {
-        const b = T ? { x: o > 0 ? anchor.x + anchor.w + gap : anchor.x - gap - w, y: cy - h / 2, w, h } : { x: cx - w / 2, y: o > 0 ? anchor.y + anchor.h + gap : anchor.y - gap - h, w, h };
+      const places = sides.map((o) => (T ? { x: o > 0 ? anchor.x + anchor.w + gap : anchor.x - gap - w, y: cy - h / 2, w, h } : { x: cx - w / 2, y: o > 0 ? anchor.y + anchor.h + gap : anchor.y - gap - h, w, h }));
+      if (across && T && lim) {
+        const x = Math.max(dLo + 1, Math.min(dHi - 1 - w, cx - w / 2));
+        for (const y of [anchor.y + anchor.h + 1.5, anchor.y - 1.5 - h]) if (y >= lim[0] && y + h <= lim[1]) places.push({ x, y, w, h });
+      }
+      for (const b of places) {
         if (lim && !T) b.x = Math.max(lim[0], Math.min(lim[1] - w, b.x));
         const lo = T ? b.x : b.y, hi = T ? b.x + b.w : b.y + b.h;
         if (lo < dLo + 1 || hi > dHi - 1 || taken.some((t) => overlaps(b, t))) continue;
@@ -621,19 +627,19 @@
       }
       return false;
     };
-    const cellLim = (m) => [g.cell(m.j) + 2, g.cell(m.j) + g.cs - 2];
+    const cellLim = (m) => [g.cell(m.j) + (T ? 0.5 : 2), g.cell(m.j) + g.cs - (T ? 0.5 : 2)];
     const inkText = (p) => (p.m.is13 ? p.col : C['setup-ink']);
     // the distance of each chip: away from the current price, or on the other side when that place is taken (nearest
     // marks choose first)
     for (const c of chips) {
       const p = c.p, m = p.m;
-      put(fmtPct(m.fire.pct), F.m(m.near ? 700 : 600, 9), 8, c.b, [p.out, -p.out], 2, inkText(p), p.a, m.id, cellLim(m));
+      if (put(fmtPct(m.fire.pct), F.m(m.near ? 700 : 600, 9), 8, c.b, [p.out, -p.out], 2, inkText(p), p.a, m.id, cellLim(m), true)) p.note = fmtPct(m.fire.pct);
     }
     // a chip that stands for several marks says how many ("×2"), on its other side; the hint under the picture
     // explains it then
     g.times = false;
-    for (const c of chips) if (c.n > 1 && put(`×${c.n}`, F.m(700, 9), 8, c.b, [-c.p.out, c.p.out], 2, inkText(c.p), c.p.a, c.p.m.id, cellLim(c.p.m))) g.times = true;
-    for (const list of nows.values()) { const p = list[0]; if (p.tag && list.length > 1 && put(`×${list.length}`, F.m(700, 9), 8, p.tag, [p.out], 2, inkText(p), p.a, p.m.id, cellLim(p.m))) g.times = true; }
+    for (const c of chips) if (c.n > 1 && put(`×${c.n}`, F.m(700, 9), 8, c.b, [-c.p.out, c.p.out], 2, inkText(c.p), c.p.a, c.p.m.id, cellLim(c.p.m))) { g.times = true; c.p.times = c.n; }
+    for (const list of nows.values()) { const p = list[0]; if (p.tag && list.length > 1 && put(`×${list.length}`, F.m(700, 9), 8, p.tag, [p.out], 2, inkText(p), p.a, p.m.id, cellLim(p.m))) { g.times = true; p.times = list.length; } }
     // a short bar gets its number when there is room
     for (const p of P) if (p.small) put(markText(p.m), F.m(700, 9.5), 8, p.box, [p.out, -p.out], 2.5, inkText(p), p.a, p.m.id, cellLim(p.m));
     // "종" at the tick of a close level, on the side of the current price when there is room
@@ -652,7 +658,7 @@
         const x = T ? (o > 0 ? e + 4 : e - 4 - w) : a + g.cs / 2 - w / 2, y = T ? a + g.cs / 2 + (i - (rows - 1) / 2) * 10 : e + o * (8 + i * 10.5);
         ctx.fillStyle = !p ? C.muted : inkText(p);
         ctx.fillText(txt, x, y + 0.5);
-        if (p) { p.tbox = { x, y: y - 5, w, h: 10 }; hit(p.m.id, p.tbox, 2, 0.5); }
+        if (p) { p.tbox = { x, y: y - 5, w, h: 10 }; p.note = txt; hit(p.m.id, p.tbox, 2, 0.5); }
       }
     }
     return P;

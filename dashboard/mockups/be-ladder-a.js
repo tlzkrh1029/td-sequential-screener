@@ -32,7 +32,7 @@
   const GROUP_START = new Set(['8D', '1M']);   // as the screener table: 1D…1W | 8D…3W | 1M…12M
   // table geometry in px: timeframe column, least and greatest width of a distance column (percent + text), room at
   // the outer end of a setup / countdown gauge for its number or chip, what a gauge cell adds around them (padding, gap)
-  const G = { center: 98, dist: 172, distMax: 290, pct: 42, slot9: 24, slot13: 40, pad: 8 };   // slot13 holds the longest chip, "13rx2"
+  const G = { center: 98, dist: 172, distMax: 290, pct: 42, slot9: 24, slot13: 37, pad: 8 };   // slot13 holds the longest chip, "13rx2" (in the smaller type of .lda-long)
 
   const CSS = `
 .lda { display: grid; gap: 12px; min-width: 0; grid-template-columns: minmax(0, 1fr); --lda-hot: color-mix(in srgb, var(--hl) 11%, var(--surface)); }
@@ -63,8 +63,12 @@
 .lda-old { display: inline-flex; align-items: flex-start; gap: 1px; }
 .lda-old > b { background: color-mix(in srgb, var(--c) 30%, var(--surface)); color: var(--fg); }
 .lda-old > i { font: 500 9px/1 var(--font-mono); font-style: normal; color: var(--muted); }
-.lda-old.lda-long > b { font-size: 9.5px; padding: 0 2px; }
+.lda-long > b { font-size: 9.5px; padding: 0 2px; }
+.lda-xlong > b { font-size: 9px; letter-spacing: -.2px; padding: 0 2px; }
 .lda-rep > b { opacity: .55; }
+.lda-r9 { display: inline-flex; align-items: center; gap: 1px; }
+.lda-r9 .k9 { padding: 0 2px; }
+.lda-r9 .lda-n { font-size: 9px; }
 .lda-p13, .lda-p9 { display: inline-block; flex: none; font: 600 11px/13px var(--font-mono); padding: 0 3px; border-radius: 4px; border: 1px solid var(--c, var(--setup)); color: var(--fg); }
 .lda-p13 { background: color-mix(in srgb, var(--c) 14%, transparent); }
 .lda-p13.n1 { background: color-mix(in srgb, var(--c) 26%, transparent); box-shadow: 0 0 0 1px var(--c); }
@@ -346,7 +350,8 @@
   function setupSlot(s) {
     const L = s.nines.find((x) => x.ago === 0);
     const num = `<b class="lda-n${s.t9 ? ' hi' : ''}">${s.raw}</b>`;
-    if (L) return `<span${L.rep ? ' class="lda-rep"' : ''}>${chipHTML('S', L.text)}</span>${s.raw > 9 ? num : ''}`;
+    // a repeated 9 keeps its raw count next to the chip, both a little smaller so that they fit the slot
+    if (L) return s.raw > 9 ? `<span class="lda-r9"><span${L.rep ? ' class="lda-rep"' : ''}>${chipHTML('S', L.text)}</span>${num}</span>` : `<span${L.rep ? ' class="lda-rep"' : ''}>${chipHTML('S', L.text)}</span>`;
     return s.raw > 0 ? num : '';
   }
   // countdown gauge of one family: 13 segments filled to the highest count among the active origins; short lines
@@ -365,9 +370,10 @@
   }
   function runSlot(F) {
     const many = F.runs.length > 1 ? `<i class="lda-x">×${F.runs.length}</i>` : '';
-    if (F.done) return chipHTML('C', F.done.text, F.f);
+    // the longest texts fit the slot in smaller type: "13rx2" alone, "13x2" and "13rx2" with the bars ago next to them
+    if (F.done) return F.done.text.length > 4 ? `<span class="lda-long">${chipHTML('C', F.done.text, F.f)}</span>` : chipHTML('C', F.done.text, F.f);
     if (F.defer) return chipHTML('I', F.defer.text, F.f) + many;
-    if (F.old) return `<span class="lda-old${F.old.text.length > 4 ? ' lda-long' : ''}">${chipHTML('C', F.old.text, F.f)}<i>${F.old.ago}</i></span>`;   // "13rx2" and the bars ago fit the slot in smaller type
+    if (F.old) return `<span class="lda-old${F.old.text.length > 4 ? ' lda-xlong' : F.old.text.length > 3 ? ' lda-long' : ''}">${chipHTML('C', F.old.text, F.f)}<i>${F.old.ago}</i></span>`;
     return F.runs.length ? `<b class="lda-n${F.hi === 12 ? ' hi' : ''}">${F.hi}</b>${many}` : '';
   }
   // distance track: the current price at the inner end, 25% away at the outer end, a dot per 13 trigger (the nearest
