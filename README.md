@@ -38,18 +38,25 @@
 
 ## Bird eye 시안
 
-`dashboard/mockups/`에는 Bird eye 화면의 시안이 있습니다. 세 가지 화면을 두 가지 방식씩 만들었고, 스크리너와 같은 데이터를 같은 엔진으로 셉니다. 소유자가 화면마다 방식을 고르면, 고른 방식을 사이트에 넣습니다.
+`dashboard/mockups/`에는 Bird eye 화면의 시안이 있습니다. 스크리너와 같은 데이터를 같은 엔진으로 셉니다.
+
+- **Bird eye 차트.** 한 종목의 일봉 차트 한 장에 20개 타임프레임의 9와 13을 숫자로 적습니다. 숫자는 그 타임프레임 봉의 마지막 날 자리에 있고, 위 첨자가 타임프레임, 색이 계열입니다. 위의 조감 띠는 전체 기간에서 9와 13이 나온 자리를 타임프레임마다 한 줄로 보여 주고, 차트 오른쪽 끝에는 다음 봉 조건이 있습니다. 지금은 BTC와 ETH에 먼저 적용합니다.
+
+아래 세 화면은 먼저 만든 시안이고, 화면마다 두 가지 방식이 있습니다.
 
 - **시장 조감도.** 데이터가 있는 모든 종목의 20개 타임프레임을 한 화면에 보여 줍니다. A는 픽셀 매트릭스이고, B는 TF 신호 보드입니다.
 - **여러 TF 한 장.** 한 종목의 20개 타임프레임을 한 장에 보여 줍니다. A는 격자 시트이고, B는 시간 정렬 레인입니다.
 - **TF 사다리.** 한 종목의 타임프레임마다 9와 13까지의 진행 상황과 조건가를 보여 줍니다. A는 진행 게이지이고, B는 가격 사다리입니다.
 
-`birdeye.html`은 화면 틀과 공통 함수(`BE`)이고, `be-<화면>-<a|b>.js` 파일 하나가 시안 하나입니다. `dashboard/td-view.js`는 진행 중인 봉이 어느 가격에 닿으면 9나 13이 나오는지를 계산합니다. `test/view.test.mjs`는 그 가격으로 만든 봉을 엔진에 넣고 다시 세어서, 계산한 가격이 맞는지 확인합니다.
+`birdeye.html`은 화면 틀과 공통 함수(`BE`)이고, `be-chart.js`가 Bird eye 차트, `be-<화면>-<a|b>.js` 파일 하나가 시안 하나입니다. 페이지는 빌드에 넣은 화면만 보여 줍니다. `dashboard/td-view.js`는 진행 중인 봉이 어느 가격에 닿으면 9나 13이 나오는지를 계산합니다. `test/view.test.mjs`는 그 가격으로 만든 봉을 엔진에 넣고 다시 세어서, 계산한 가격이 맞는지 확인합니다.
 
-시안 페이지를 `dist/birdeye`에 만듭니다. 여는 방법은 아래의 사이트와 같습니다.
+시안 페이지를 `dist/birdeye`에 만듭니다. 여는 방법은 아래의 사이트와 같습니다. `--includes`는 페이지에 넣을 화면 파일을 고르고, `--coins`는 페이지와 일봉 파일에 넣을 종목을 고릅니다.
 
 ```bash
+# 모든 화면, 모든 종목
 node scripts/build-site.mjs dist/birdeye --template dashboard/mockups/birdeye.html --chunk 8
+# Bird eye 차트만, BTC와 ETH만 (이 페이지는 index.html과 d/0.json만 읽습니다)
+node scripts/build-site.mjs dist/birdeye-chart --template dashboard/mockups/birdeye.html --chunk 8 --includes be-chart --coins BTC,ETH
 ```
 
 ## 로컬에서 빌드하고 보기
@@ -141,7 +148,7 @@ node scripts/td-dump.mjs --out /tmp/td-dump --tickers CRYPTO:BTCUSD --tfs 2W
 - `dashboard/td-engine.js`: TD Research v6 엔진과 다음 봉 조건을 계산합니다.
 - `dashboard/screener.html`: 페이지 템플릿입니다. 빌드가 여기에 데이터와 위의 두 모듈을 넣습니다.
 - `dashboard/td-view.js`: 다음 봉 조건이 충족되는 가격과, 화면에 쓰는 타임프레임별 상태를 계산합니다.
-- `dashboard/mockups/`: Bird eye 시안입니다. 화면 틀(`birdeye.html`)과 시안 여섯 개(`be-*.js`)가 있습니다.
+- `dashboard/mockups/`: Bird eye 시안입니다. 화면 틀(`birdeye.html`), Bird eye 차트(`be-chart.js`), 먼저 만든 시안 여섯 개(`be-<화면>-<a|b>.js`)가 있습니다.
 - `scripts/`: 수집(`fetch-tv.mjs`), 종목 목록 복사(`sync-universe.mjs`), 빌드(`build-site.mjs`), 신선도 검사(`check-fresh.mjs`), 라벨 덤프(`td-dump.mjs`)가 있습니다.
 - `verify/`: Python 참조 구현(`ref/`), 두 구현 비교(`diff.mjs`, `fuzz.mjs`), 자체 봉 비교(`native/`), 다음 봉 조건 검사(`triggers-check.mjs`), 결과 파일(`out/`)이 있습니다.
 - `test/`: Node 테스트입니다.

@@ -4,9 +4,10 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap">
 <style id="be-shell-css">
-/* Bird eye design study. Three views behind the screener's app bar (whole market, one coin on many timeframes,
-   timeframe ladder), two variants of each to compare. Tokens, controls and marks are the screener's own
-   (dashboard/screener.html), so a chosen variant can move into the site as it is. */
+/* Bird eye design study. Views behind the screener's app bar: the bird eye chart of one coin, and the three earlier
+   screens (whole market, one coin on many timeframes, timeframe ladder) with two variants each to compare. A page
+   holds the views whose files it was built with (scripts/build-site.mjs --includes). Tokens, controls and marks are
+   the screener's own (dashboard/screener.html), so a chosen variant can move into the site as it is. */
 :root {
   --bg: #f4f6f8; --surface: #ffffff; --sunken: #eef1f4; --fg: #141922; --muted: #5b6574; --faint: #737c8a;
   --line: #dfe3e8; --accent: #2f5bd3; --accent-soft: #e6ecfb; --warn-bg: #fff6db; --warn-fg: #7a5a00; --hl: #f2b300;
@@ -131,7 +132,7 @@ body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-a
 
 <main class="wrap">
   <div class="panel controls" role="group" aria-label="시안과 종목 고르기">
-    <div class="ctl"><span id="lb-var">시안</span><div class="seg" role="group" aria-labelledby="lb-var" id="varSeg"></div></div>
+    <div class="ctl" id="varCtl"><span id="lb-var">시안</span><div class="seg" role="group" aria-labelledby="lb-var" id="varSeg"></div></div>
     <div class="ctl" id="coinCtl"><span id="lb-coin">종목</span>
       <div class="coinpick">
         <button type="button" class="btn sm" id="prevCoin" aria-label="시가총액이 하나 높은 종목">←</button>
@@ -189,7 +190,7 @@ const DATA = /*__DATA__*/null;
 //                        pad() label offsets, byBar() Map bar -> label indices}]}
 //                       Rejects with an Error (err.stale = a newer build was deployed) when the data cannot be read.
 // Shared state
-//   BE.state            {view 'market'|'sheet'|'ladder', key 'a'|'b' (the variant shown), coin (slug), fam: [..]}
+//   BE.state            {view 'chart'|'market'|'sheet'|'ladder', key 'a'|'b' (the variant shown), coin (slug), fam: [..]}
 //   BE.coin()           the coin of the per-coin views; BE.famOn(f); BE.go({view, key, coin}) navigates (hash)
 //   BE.openCoin(slug, view = 'sheet')   from the market views: show that coin
 //   BE.vstate(id, defaults)             a variant's own settings object, kept in localStorage; BE.save() after a change
@@ -213,6 +214,9 @@ const DATA = /*__DATA__*/null;
 //     mount(root)   build the variant's DOM inside root (an empty element); called each time the variant is shown
 //     render(why)   draw from the shared state; called after mount and on 'coin', 'fam', 'theme', 'resize'
 //     unmount()     optional: stop timers, drop listeners outside root
+//   good and weak may be left out: the description then shows the blurb alone, and stays folded until it is asked for.
+// The page shows what was registered: a tab per view that has a variant (none when there is one view), the variant
+// switch where a view has two, and the first such view when the address names none.
 // ====================================================================================================================
 // A host that puts this page inside its own <body> (a published artifact) leaves the style element above in the body,
 // while the variants append theirs to <head>. Move it to the head, so that a variant's rule still comes after a shell
@@ -292,6 +296,7 @@ const BE = (() => {
   }
   const coinBySlug = (s) => SLUG.get(String(s || '').toLowerCase()) || null;
   const WITH_DATA = COINS.filter((c) => c.t);
+  const FEW_COINS = 8;   // up to this many coins with data, the coin picker is a button per coin
 
   // the coins a search text means: the coin of that symbol or name when there is one, otherwise the coins whose
   // symbol starts with it, otherwise the coins whose name holds it
@@ -417,8 +422,9 @@ const BE = (() => {
   }
 
   // ---------- shared state, kept in localStorage when it is there ----------
-  const VIEWS = [['market', '시장 조감도'], ['sheet', '여러 TF 한 장'], ['ladder', 'TF 사다리']];
-  const state = { view: 'market', key: 'a', keys: { market: 'a', sheet: 'a', ladder: 'a' }, coin: 'btc', fam: FAMS.slice(), note: true, v: {} };
+  const VIEWS = [['chart', 'Bird eye 차트'], ['market', '시장 조감도'], ['sheet', '여러 TF 한 장'], ['ladder', 'TF 사다리']];
+  // view null: not chosen yet (the first route takes the address, or the first view the page has)
+  const state = { view: null, key: 'a', keys: { chart: 'a', market: 'a', sheet: 'a', ladder: 'a' }, coin: 'btc', fam: FAMS.slice(), note: true, v: {} };
   try {
     const s = JSON.parse(localStorage.getItem('td-birdeye') || '{}');
     if (s.keys) for (const [v] of VIEWS) if (s.keys[v] === 'a' || s.keys[v] === 'b') state.keys[v] = s.keys[v];
@@ -427,8 +433,12 @@ const BE = (() => {
     if (s.v && typeof s.v === 'object') state.v = s.v;
     if (typeof s.note === 'boolean') state.noteSaved = s.note;
   } catch (e) { /* no storage: defaults */ }
-  // the note opens by itself on a wide screen; on a phone the picture comes first
-  state.note = typeof state.noteSaved === 'boolean' ? state.noteSaved : innerWidth > 720;
+  // the note: the reader's own choice once it is made (the button). Until then it opens by itself on a wide screen for
+  // a variant with lists to weigh; on a phone, and for a variant with a blurb alone, the picture comes first
+  const NOTE_WIDE = innerWidth > 720;
+  const hasLists = (v) => !!((v.good && v.good.length) || (v.weak && v.weak.length));
+  const noteOpen = (v) => (typeof state.noteSaved === 'boolean' ? state.noteSaved : NOTE_WIDE && (!v || hasLists(v)));
+  state.note = noteOpen(null);
   if (!coinBySlug(state.coin)) state.coin = (WITH_DATA[0] || COINS[0]).slug;
   function save() { try { localStorage.setItem('td-birdeye', JSON.stringify({ keys: state.keys, coin: state.coin, fam: state.fam, ...(typeof state.noteSaved === 'boolean' ? { note: state.noteSaved } : {}), v: state.v })); } catch (e) { /* ignore */ } }
   // a settings object kept by id: the same object on every call, with the defaults filled in where a value is missing
@@ -519,6 +529,9 @@ const BE = (() => {
   // ---------- variants, routing ----------
   const VARIANTS = new Map();
   function register(v) { VARIANTS.set(v.view + '-' + v.key, v); }
+  // what this page was built with: the variants of a view, and the views that have one
+  const keysOf = (view) => ['a', 'b'].filter((key) => VARIANTS.has(view + '-' + key));
+  const liveViews = () => VIEWS.map((v) => v[0]).filter((v) => keysOf(v).length > 0);
   let ACTIVE = null, ROOT = null;
   const hashOf = (view, key, slug) => `#${view}-${key}` + (view !== 'market' && slug ? `-${slug}` : '');
   const hrefOf = (view, slug) => hashOf(view, state.keys[view] || 'a', slug || state.coin);
@@ -530,9 +543,14 @@ const BE = (() => {
   const openCoin = (slug, view = 'sheet') => go({ view, coin: slug });
   function renderActive(why) { if (ACTIVE && ROOT) { try { ACTIVE.render(why); } catch (e) { console.error(e); ROOT.replaceChildren(el('div', 'empty', `이 시안을 그리다가 오류가 났습니다: ${e.message}`)); } } }
   function route() {
-    const m = /^#(market|sheet|ladder)(?:-([ab]))?(?:-([a-z0-9]+))?$/.exec(location.hash.toLowerCase());
+    const m = /^#(chart|market|sheet|ladder)(?:-([ab]))?(?:-([a-z0-9]+))?$/.exec(location.hash.toLowerCase());
     const before = state.coin;
     if (m) { state.view = m[1]; if (m[2]) state.keys[m[1]] = m[2]; if (m[3] && coinBySlug(m[3])) state.coin = m[3]; }
+    // a view or a variant this page was built without (an old address, a saved choice): the first one it has
+    const live = liveViews();
+    if (!live.includes(state.view)) state.view = live[0] || state.view || VIEWS[0][0];
+    const keys = keysOf(state.view);
+    if (keys.length && !keys.includes(state.keys[state.view])) state.keys[state.view] = keys[0];
     state.key = state.keys[state.view];
     save();
     const next = VARIANTS.get(state.view + '-' + state.key) || null;
@@ -556,7 +574,8 @@ const BE = (() => {
       a.setAttribute('aria-current', v === state.view ? 'page' : 'false');
       a.href = hashOf(v, state.keys[v], state.coin);
     }
-    const vs = $('varSeg'); vs.replaceChildren();
+    const vs = $('varSeg'), keys = keysOf(state.view); vs.replaceChildren();
+    $('varCtl').hidden = keys.length < 2;   // nothing to switch between
     for (const key of ['a', 'b']) {
       const v = VARIANTS.get(state.view + '-' + key);
       const b = el('button', null, `${key.toUpperCase()} · ${v ? v.name : '준비 중'}`); b.type = 'button';
@@ -566,14 +585,17 @@ const BE = (() => {
     }
     $('coinCtl').hidden = !perCoin;
     const note = $('vnote'), v = VARIANTS.get(state.view + '-' + state.key); note.replaceChildren();
+    state.note = noteOpen(v);
     note.hidden = !state.note || !v;
     $('noteBtn').textContent = state.note ? '설명 접기' : '설명 보기';
     $('noteBtn').setAttribute('aria-expanded', String(state.note));
     if (v) {
-      const h = el('h2', null, `시안 ${state.key.toUpperCase()} · ${v.name}`); h.append(el('small', null, VIEWS.find((x) => x[0] === state.view)[1]));
+      // a view with one variant is named by it alone
+      const viewName = VIEWS.find((x) => x[0] === state.view)[1];
+      const h = el('h2', null, keys.length < 2 ? v.name : `시안 ${state.key.toUpperCase()} · ${v.name}`); if (keys.length > 1 || v.name !== viewName) h.append(el('small', null, viewName));
       const p = el('p'); p.innerHTML = v.blurb || '';
       note.append(h, p);
-      if ((v.good && v.good.length) || (v.weak && v.weak.length)) {
+      if (hasLists(v)) {
         const pc = el('div', 'pc');
         if (v.good && v.good.length) { const s = el('div'); s.append(el('b', null, '좋은 점 '), document.createTextNode(v.good.join(' · '))); pc.append(s); }
         if (v.weak && v.weak.length) { const s = el('div'); s.append(el('b', null, '아쉬운 점 '), document.createTextNode(v.weak.join(' · '))); pc.append(s); }
@@ -599,12 +621,25 @@ const BE = (() => {
   function start() {
     readColors();
     $('asof').textContent = `${DATA.lastClosedDay} 마감 · 실제 데이터`;
-    $('lead').textContent = `이 페이지는 bird eye 화면의 시안입니다. 화면마다 시안 A와 B를 바꿔 보시고, 마음에 드는 쪽과 고칠 점을 알려 주세요. 모든 숫자는 ${DATA.lastClosedDay} 마감 봉까지의 실제 데이터를 TD Research v6 기본 설정으로, 사이트와 같은 엔진으로 센 값입니다.`;
+    // the introduction follows what the page holds: variants to compare, or one screen (for a few coins)
+    const live = liveViews(), few = WITH_DATA.length <= FEW_COINS;
+    const counted = `모든 숫자는 ${DATA.lastClosedDay} 마감 봉까지의 실제 데이터를 TD Research v6 기본 설정으로, 사이트와 같은 엔진으로 센 값입니다.`;
+    let intro = '이 페이지는 bird eye 화면의 시안입니다.';
+    if (live.some((v) => keysOf(v).length > 1)) intro += ' 화면마다 시안 A와 B를 바꿔 보시고, 마음에 드는 쪽과 고칠 점을 알려 주세요.';
+    else if (live.length === 1) {
+      const name = VIEWS.find((x) => x[0] === live[0])[1], last = name.charCodeAt(name.length - 1);
+      const obj = last >= 0xAC00 && last <= 0xD7A3 && (last - 0xAC00) % 28 ? '을' : '를';   // 차트를, 한 장을
+      const count = ['', '한', '두', '세', '네', '다섯', '여섯', '일곱', '여덟'][WITH_DATA.length];
+      intro = few && count ? `이 페이지는 ${name}${obj} ${WITH_DATA.map((c) => c.s).join(', ')} ${count} 종목에 먼저 적용한 시안입니다.` : `이 페이지는 ${name} 시안입니다.`;
+    }
+    $('lead').textContent = `${intro} ${counted}`;
     const barH = () => document.documentElement.style.setProperty('--appbar-h', document.querySelector('.appbar').offsetHeight + 'px');
     barH(); addEventListener('resize', barH);
     $('noteBtn').addEventListener('click', () => { state.note = !state.note; state.noteSaved = state.note; save(); syncShell(); renderActive('resize'); });
+    // a tab per view the page has; one view needs no tabs
     const tabs = $('tabs');
-    for (const [v, name] of VIEWS) { const a = el('a', null, name); a.dataset.view = v; tabs.append(a); }
+    for (const [v, name] of VIEWS) { if (!live.includes(v)) continue; const a = el('a', null, name); a.dataset.view = v; tabs.append(a); }
+    tabs.hidden = live.length < 2;
     const dl = $('coinList');
     for (const c of WITH_DATA) { const o = el('option'); o.value = c.s; o.label = `${c.r}위 ${nameOf(c)}`; dl.append(o); }
     const pick = (text) => {
@@ -617,7 +652,9 @@ const BE = (() => {
     const step = (k) => { const i = WITH_DATA.indexOf(coin()); const c = WITH_DATA[i + k]; if (c) go({ coin: c.slug }); };
     $('prevCoin').addEventListener('click', () => step(-1));
     $('nextCoin').addEventListener('click', () => step(1));
-    for (const s of ['btc', 'eth', 'xrp', 'sol', 'doge', 'pepe']) {
+    // a page with a few coins: one button per coin in rank order, and nothing to search or to step through
+    for (const id of ['prevCoin', 'coinInput', 'nextCoin']) $(id).hidden = few;
+    for (const s of few ? WITH_DATA.map((c) => c.slug) : ['btc', 'eth', 'xrp', 'sol', 'doge', 'pepe']) {
       const c = coinBySlug(s); if (!c || !c.t) continue;
       const b = el('button', null, c.s); b.type = 'button'; b.dataset.slug = c.slug; b.addEventListener('click', () => go({ coin: c.slug })); $('quick').append(b);
     }
@@ -646,6 +683,7 @@ const BE = (() => {
     trigText, fireText, isDark, hrefOf, side, detail, register, go, openCoin, start };
 })();
 </script>
+<script>/*__INCLUDE:be-chart.js__*/</script>
 <script>/*__INCLUDE:be-market-a.js__*/</script>
 <script>/*__INCLUDE:be-market-b.js__*/</script>
 <script>/*__INCLUDE:be-sheet-a.js__*/</script>
