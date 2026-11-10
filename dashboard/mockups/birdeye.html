@@ -91,12 +91,14 @@ body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-a
 .tip .row { display: flex; gap: 6px; align-items: baseline; flex-wrap: wrap; }
 
 /* study shell: which variant, which coin, what the variant is */
-.vnote { padding: 10px 14px; display: grid; gap: 4px; }
+.vnote { padding: 8px 14px 9px; display: grid; gap: 3px; }
 .vnote h2 { font-size: 15px; }
 .vnote h2 small { font-weight: 500; font-size: 12px; color: var(--muted); margin-left: 8px; }
-.vnote p { margin: 0; font-size: 13px; max-width: 110ch; }
-.vnote .pc { display: flex; flex-wrap: wrap; gap: 4px 22px; font-size: 12.5px; color: var(--muted); }
+.vnote p { margin: 0; font-size: 13px; }
+.vnote .pc { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 2px 28px; font-size: 12.5px; color: var(--muted); }
 .vnote .pc b { color: var(--fg); font-weight: 600; }
+.note-btn { margin-left: auto; }
+@media (max-width: 900px) { .vnote .pc { grid-template-columns: minmax(0, 1fr); } }
 .coinhead { display: flex; flex-wrap: wrap; gap: 6px 14px; align-items: baseline; }
 .coinhead h1 { font: 700 22px var(--font-mono); }
 .coinhead .nm { color: var(--muted); }
@@ -128,7 +130,6 @@ body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-a
 </header>
 
 <main class="wrap">
-  <p class="lead" id="lead"></p>
   <div class="panel controls" role="group" aria-label="시안과 종목 고르기">
     <div class="ctl"><span id="lb-var">시안</span><div class="seg" role="group" aria-labelledby="lb-var" id="varSeg"></div></div>
     <div class="ctl" id="coinCtl"><span id="lb-coin">종목</span>
@@ -141,10 +142,12 @@ body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-a
       </div>
     </div>
     <div class="ctl"><span id="lb-fam">계열</span><div class="seg fam" role="group" aria-labelledby="lb-fam" id="famSeg"></div></div>
+    <button type="button" class="btn sm note-btn" id="noteBtn" aria-controls="vnote"></button>
   </div>
   <div class="panel vnote" id="vnote"></div>
   <div class="coinhead" id="coinHead" hidden></div>
   <div id="stage"></div>
+  <p class="lead" id="lead"></p>
   <footer class="foot">
     <span>코인 목록, 순위, 시가총액: CoinGecko · <a href="https://www.coingecko.com" target="_blank" rel="noopener">Data provided by CoinGecko</a></span>
     <span>가격: TradingView CRYPTO:&lt;코인&gt;USD 일봉, 1W 봉, 1M 봉</span>
@@ -199,6 +202,12 @@ const DATA = /*__DATA__*/null;
 //   BE.padArray(bars, mintick), BE.labelPrice(L, bars, pad), BE.labelColor(L), BE.LABEL_FONT   where and how the
 //                       indicator draws a label (as the screener's coin chart)
 //   BE.dateTicks(days, px), BE.tvUrl(usd, tf), BE.exNames(c), BE.nameOf(c), BE.agoText(ago)
+//   BE.EX_NAME {U, B, N}, BE.GROUP_START (Set of the timeframe indices a group gap comes before: 8D and 1M),
+//   BE.hrefOf(view, slug) the hash of a coin in a view (with the variant last shown there), BE.isDark(),
+//   BE.findCoins(text) the coins a search text means, BE.lastBar(j) {ls, le, coins} the last confirmed bar most coins
+//   have on timeframe j, BE.isLate(c, j) the coin's last confirmed bar there is older than that
+//   BE.trigText(t) a next-bar trigger as a sentence; BE.fireText(fire) where the bar in progress stands against it
+//   The root element carries --appbar-h, the height of the sticky app bar.
 // A variant
 //   BE.register({ view, key, name, blurb, good: [..], weak: [..], mount(root), render(why), unmount() })
 //     mount(root)   build the variant's DOM inside root (an empty element); called each time the variant is shown
@@ -230,10 +239,13 @@ const BE = (() => {
     st.setProperty('--setup', SETUP_COLOR);
   }
   const C = {};
+  let DARK = false;
   function readColors() {
     const cs = getComputedStyle(document.documentElement);
     for (const k of ['fg', 'muted', 'faint', 'line', 'surface', 'sunken', 'accent', 'accent-soft', 'up', 'down', 'bg', 'hl', 'setup-ink']) C[k] = cs.getPropertyValue('--' + k).trim();
+    DARK = /^#[0-9a-f]{6}$/i.test(C.surface) ? relLum(hexRgb(C.surface)) < 0.2 : false;
   }
+  const isDark = () => DARK;
 
   // ---------- numbers and names ----------
   function fmtPrice(v) {
@@ -261,6 +273,7 @@ const BE = (() => {
   const exNames = (c) => ['U', 'B', 'N'].filter((x) => c.x.includes(x)).map((x) => EX_NAME[x]).join(' · ') || '업비트·빗썸·바이낸스 미상장(직접 추가한 종목)';
   const nameOf = (c) => c.k || c.n;
   const agoText = (ago) => (ago === 0 ? '마지막 봉' : ago + '봉 전');
+  const GROUP_START = new Set([TFS.indexOf('8D'), TFS.indexOf('1M')]); // 1D…1W | 8D…3W | 1M…12M, as the screener table
   const tvInterval = (tf) => { const m = /^(\d+)([DWM])$/.exec(tf); return (m[1] === '1' ? '' : m[1]) + m[2]; };
   const tvUrl = (usd, tf) => `https://www.tradingview.com/chart/?symbol=${encodeURIComponent(usd)}&interval=${tvInterval(tf)}`;
 
@@ -275,6 +288,62 @@ const BE = (() => {
   }
   const coinBySlug = (s) => SLUG.get(String(s || '').toLowerCase()) || null;
   const WITH_DATA = COINS.filter((c) => c.t);
+
+  // the coins a search text means: the coin of that symbol or name when there is one, otherwise the coins whose
+  // symbol starts with it, otherwise the coins whose name holds it
+  function findCoins(text) {
+    const q = String(text || '').trim().toLowerCase(); if (!q) return [];
+    const low = (x) => String(x || '').toLowerCase();
+    const exact = WITH_DATA.filter((c) => low(c.s) === q || low(c.k) === q || low(c.n) === q);
+    if (exact.length) return exact;
+    const bySymbol = WITH_DATA.filter((c) => low(c.s).startsWith(q));
+    return bySymbol.length ? bySymbol : WITH_DATA.filter((c) => low(c.k).includes(q) || low(c.n).includes(q));
+  }
+  // the last confirmed bar most coins have on a timeframe, and whether a coin's own is older (TradingView stopped
+  // serving it, or it has no bar on the last days)
+  const LASTBAR = new Map();
+  function lastBar(j) {
+    let b = LASTBAR.get(j);
+    if (!b) {
+      const count = new Map();
+      for (const c of WITH_DATA) { const T = c.t[j]; if (T) count.set(T.ls, (count.get(T.ls) || 0) + 1); }
+      let ls = null, n = 0; for (const [d, k] of count) if (k > n || (k === n && d > ls)) { ls = d; n = k; }
+      const T = ls == null ? null : WITH_DATA.find((c) => c.t[j] && c.t[j].ls === ls).t[j];
+      b = { ls, le: T ? T.le : null, coins: n }; LASTBAR.set(j, b);
+    }
+    return b;
+  }
+  const isLate = (c, j) => { const T = c.t && c.t[j], b = lastBar(j); return !!T && b.ls != null && T.ls < b.ls; };
+
+  // ---------- next-bar conditions in words (one wording for every variant) ----------
+  const SRC_KO = { o: '시가', h: '고가', l: '저가', c: '종가', hl: '고가와 저가의 차이' };
+  const OP_KO = { '<': '미만', '<=': '이하', '>': '초과', '>=': '이상' };
+  const condText = ([src, op, v]) => `${SRC_KO[src] || src}가 ${fmtPrice(v)} ${OP_KO[op] || op}`;
+  const groupText = (g) => g.map(condText).join('이고 ');
+  function anyText(any) {
+    const first = any[0][0];
+    if (any.every((g) => g.length === 1 && g[0][1] === first[1] && g[0][2] === first[2])) return `${any.map((g) => SRC_KO[g[0][0]] || g[0][0]).join('나 ')}가 ${fmtPrice(first[2])} ${OP_KO[first[1]] || first[1]}`;
+    return any.map(groupText).join('이거나 ');
+  }
+  // a trigger as a sentence: "진행 중인 봉의 저가가 … 이하이고, 종가나 시가가 … 이하이면 13이 나옵니다." An empty group
+  // always holds: in `any` it makes that part hold, in `unless` it cancels the label.
+  function trigText(t) {
+    const what = t.k === 'C13' ? '13이' : '9가', parts = [];
+    if (t.all && t.all.length) parts.push(groupText(t.all));
+    if (t.any && t.any.length && !t.any.some((g) => !g.length)) parts.push(anyText(t.any));
+    let out = parts.length ? `진행 중인 봉의 ${parts.join('이고, ')}이면 ${what} 나옵니다.` : `진행 중인 봉이 마감하면 가격과 상관없이 ${what} 나옵니다.`;
+    if (t.unless && t.unless.some((g) => !g.length)) out += ' 다만 이번 봉에서는 나오지 않습니다.';
+    else if (t.unless && t.unless.length) out += ` 다만 ${t.unless.map(groupText).join('이거나 ')}이면 나오지 않습니다.`;
+    return out;
+  }
+  // where the bar in progress stands against one trigger (VIEW.fire): "조건가 P (pct) · 닿은 뒤 Q (qpct)에서 마감해도 충족"
+  function fireText(f) {
+    if (!f) return '가격이 한 번 움직여서는 충족되지 않음';
+    if (f.now) return '지금 값으로 충족';
+    const head = `조건가 ${fmtPrice(f.p)} (${fmtPct(f.pct)})`;
+    if (f.q === f.p) return head + ' · 이 값에서 마감하면 충족';
+    return head + (f.qpct === 0 ? ' · 닿은 뒤 지금 가격에서 마감해도 충족' : ` · 닿은 뒤 ${fmtPrice(f.q)} (${fmtPct(f.qpct)})에서 마감해도 충족`);
+  }
 
   // ---------- marks ----------
   function chipHTML(kind, text, f) {
@@ -345,17 +414,26 @@ const BE = (() => {
 
   // ---------- shared state, kept in localStorage when it is there ----------
   const VIEWS = [['market', '시장 조감도'], ['sheet', '여러 TF 한 장'], ['ladder', 'TF 사다리']];
-  const state = { view: 'market', key: 'a', keys: { market: 'a', sheet: 'a', ladder: 'a' }, coin: 'btc', fam: FAMS.slice(), v: {} };
+  const state = { view: 'market', key: 'a', keys: { market: 'a', sheet: 'a', ladder: 'a' }, coin: 'btc', fam: FAMS.slice(), note: true, v: {} };
   try {
     const s = JSON.parse(localStorage.getItem('td-birdeye') || '{}');
     if (s.keys) for (const [v] of VIEWS) if (s.keys[v] === 'a' || s.keys[v] === 'b') state.keys[v] = s.keys[v];
     if (typeof s.coin === 'string' && coinBySlug(s.coin)) state.coin = s.coin;
     if (Array.isArray(s.fam)) state.fam = s.fam.filter((f) => FAMS.includes(f));
     if (s.v && typeof s.v === 'object') state.v = s.v;
+    if (typeof s.note === 'boolean') state.noteSaved = s.note;
   } catch (e) { /* no storage: defaults */ }
+  // the note opens by itself on a wide screen; on a phone the picture comes first
+  state.note = typeof state.noteSaved === 'boolean' ? state.noteSaved : innerWidth > 720;
   if (!coinBySlug(state.coin)) state.coin = (WITH_DATA[0] || COINS[0]).slug;
-  function save() { try { localStorage.setItem('td-birdeye', JSON.stringify({ keys: state.keys, coin: state.coin, fam: state.fam, v: state.v })); } catch (e) { /* ignore */ } }
-  function vstate(id, defaults) { const o = state.v[id] && typeof state.v[id] === 'object' ? state.v[id] : {}; state.v[id] = { ...defaults, ...o }; return state.v[id]; }
+  function save() { try { localStorage.setItem('td-birdeye', JSON.stringify({ keys: state.keys, coin: state.coin, fam: state.fam, ...(typeof state.noteSaved === 'boolean' ? { note: state.noteSaved } : {}), v: state.v })); } catch (e) { /* ignore */ } }
+  // a settings object kept by id: the same object on every call, with the defaults filled in where a value is missing
+  function vstate(id, defaults) {
+    if (!state.v[id] || typeof state.v[id] !== 'object') state.v[id] = {};
+    const o = state.v[id];
+    for (const k of Object.keys(defaults || {})) if (!(k in o)) o[k] = defaults[k];
+    return o;
+  }
   const famOn = (f) => state.fam.includes(f);
   const coin = () => coinBySlug(state.coin);
 
@@ -439,6 +517,7 @@ const BE = (() => {
   function register(v) { VARIANTS.set(v.view + '-' + v.key, v); }
   let ACTIVE = null, ROOT = null;
   const hashOf = (view, key, slug) => `#${view}-${key}` + (view !== 'market' && slug ? `-${slug}` : '');
+  const hrefOf = (view, slug) => hashOf(view, state.keys[view] || 'a', slug || state.coin);
   function go(to) {
     const view = to.view || state.view, key = to.key || (to.view && to.view !== state.view ? state.keys[view] : state.key), slug = to.coin || state.coin;
     const h = hashOf(view, key, slug);
@@ -483,14 +562,17 @@ const BE = (() => {
     }
     $('coinCtl').hidden = !perCoin;
     const note = $('vnote'), v = VARIANTS.get(state.view + '-' + state.key); note.replaceChildren();
+    note.hidden = !state.note || !v;
+    $('noteBtn').textContent = state.note ? '설명 접기' : '설명 보기';
+    $('noteBtn').setAttribute('aria-expanded', String(state.note));
     if (v) {
       const h = el('h2', null, `시안 ${state.key.toUpperCase()} · ${v.name}`); h.append(el('small', null, VIEWS.find((x) => x[0] === state.view)[1]));
       const p = el('p'); p.innerHTML = v.blurb || '';
       note.append(h, p);
       if ((v.good && v.good.length) || (v.weak && v.weak.length)) {
         const pc = el('div', 'pc');
-        if (v.good && v.good.length) { const s = el('span'); s.append(el('b', null, '좋은 점 '), document.createTextNode(v.good.join(' · '))); pc.append(s); }
-        if (v.weak && v.weak.length) { const s = el('span'); s.append(el('b', null, '아쉬운 점 '), document.createTextNode(v.weak.join(' · '))); pc.append(s); }
+        if (v.good && v.good.length) { const s = el('div'); s.append(el('b', null, '좋은 점 '), document.createTextNode(v.good.join(' · '))); pc.append(s); }
+        if (v.weak && v.weak.length) { const s = el('div'); s.append(el('b', null, '아쉬운 점 '), document.createTextNode(v.weak.join(' · '))); pc.append(s); }
         note.append(pc);
       }
     }
@@ -513,7 +595,10 @@ const BE = (() => {
   function start() {
     readColors();
     $('asof').textContent = `${DATA.lastClosedDay} 마감 · 실제 데이터`;
-    $('lead').textContent = `Bird eye 화면의 시안입니다. 세 가지 화면을 두 가지 방식씩 만들었습니다. 모든 숫자는 실제 데이터(${DATA.lastClosedDay} 마감 봉까지)를 TD Research v6 기본 설정으로 센 값이고, 사이트와 같은 엔진을 씁니다. 화면마다 시안 A와 B를 바꿔 보시고, 마음에 드는 쪽과 고칠 점을 알려 주세요.`;
+    $('lead').textContent = `이 페이지는 bird eye 화면의 시안입니다. 화면마다 시안 A와 B를 바꿔 보시고, 마음에 드는 쪽과 고칠 점을 알려 주세요. 모든 숫자는 ${DATA.lastClosedDay} 마감 봉까지의 실제 데이터를 TD Research v6 기본 설정으로, 사이트와 같은 엔진으로 센 값입니다.`;
+    const barH = () => document.documentElement.style.setProperty('--appbar-h', document.querySelector('.appbar').offsetHeight + 'px');
+    barH(); addEventListener('resize', barH);
+    $('noteBtn').addEventListener('click', () => { state.note = !state.note; state.noteSaved = state.note; save(); syncShell(); renderActive('resize'); });
     const tabs = $('tabs');
     for (const [v, name] of VIEWS) { const a = el('a', null, name); a.dataset.view = v; tabs.append(a); }
     const dl = $('coinList');
@@ -552,8 +637,9 @@ const BE = (() => {
   }
 
   return { DATA, TFS, OPT, LAST, DAY, COINS, WITH_DATA, FAMS, FAM_NAME, FAM_CODE, FAM_COLOR, SETUP_COLOR, BUY, SELL, SIDE, ARROW, C,
-    el, esc, iso, nf, fmtPrice, fmtPct, fmtCap, exNames, nameOf, agoText, tvUrl, chipHTML, chipEl, tip, setupCanvas, padArray, labelPrice,
-    labelColor, LABEL_FONT, dateTicks, seg, state, save, vstate, famOn, coin, coinBySlug, side, detail, register, go, openCoin, start };
+    EX_NAME, GROUP_START, el, esc, iso, nf, fmtPrice, fmtPct, fmtCap, exNames, nameOf, agoText, tvUrl, chipHTML, chipEl, tip, setupCanvas,
+    padArray, labelPrice, labelColor, LABEL_FONT, dateTicks, seg, state, save, vstate, famOn, coin, coinBySlug, findCoins, lastBar, isLate,
+    trigText, fireText, isDark, hrefOf, side, detail, register, go, openCoin, start };
 })();
 </script>
 <script>/*__INCLUDE:be-market-a.js__*/</script>
