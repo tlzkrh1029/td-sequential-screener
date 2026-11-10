@@ -9,9 +9,10 @@
 // page recounts that coin in the browser with the same engine). The breadth board's counts go into b.json.
 //
 // Output (default dist/site): index.html, b.json, d/0.json, d/1.json, ...
-// Usage: node scripts/build-site.mjs [outDir] [--daily-dir data/daily] [--chunk 3] [--fragment]
+// Usage: node scripts/build-site.mjs [outDir] [--daily-dir data/daily] [--chunk 3] [--fragment] [--template file]
 //   --chunk     coins per daily file (default 3, so the site stays under the artifact viewer's 256-file limit)
 //   --fragment  writes index.html without the document around it
+//   --template  page template with the same markers (default dashboard/screener.html), e.g. for design studies
 import { readFile, writeFile, mkdir, rm, readdir } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
 import path from 'node:path';
@@ -23,6 +24,7 @@ const opt = (name, def) => { const i = args.indexOf(name); return i >= 0 ? args.
 const DAILY_DIR = opt('--daily-dir', path.join('data', 'daily'));
 const CHUNK = Number(opt('--chunk', 3));
 const FRAGMENT = args.includes('--fragment');
+const TEMPLATE = opt('--template', path.join('dashboard', 'screener.html'));
 const OUT = args.find((a) => !a.startsWith('--')) || path.join('dist', 'site');
 if (!(CHUNK >= 1)) throw new Error('--chunk must be a positive number');
 const RECENT = 12;          // labels kept in the summary: on the last RECENT + 1 confirmed bars (DeMARK's 12-bar window)
@@ -32,7 +34,7 @@ const iso = (d) => new Date(d * DAY).toISOString().slice(0, 10);
 const universe = JSON.parse(await readFile(path.join('data', 'universe.json'), 'utf8'));
 const tickers = JSON.parse(await readFile(path.join('data', 'tickers.json'), 'utf8'));
 const status = JSON.parse(await readFile(path.join(DAILY_DIR, '_status.json'), 'utf8'));
-const template = await readFile(path.join('dashboard', 'screener.html'), 'utf8');
+const template = await readFile(TEMPLATE, 'utf8');
 const barsSrc = await readFile(path.join('dashboard', 'bars.js'), 'utf8');
 const engineSrc = await readFile(path.join('dashboard', 'td-engine.js'), 'utf8');
 const lastClosedDay = Date.parse(`${status.lastClosedDay}T00:00:00Z`) / DAY;
@@ -119,6 +121,10 @@ for (const u of universe.coins) {
   if (daily) {
     let a = 0; while (a < daily.c.length && daily.c[a] == null) a++;
     coin.li = daily.d0 + a; coin.lb = daily.d0 + daily.c.length - 1;
+    // lc: the newest daily close (the last closed day's, or the latest before it), the price that next-bar trigger
+    // distances are measured from
+    let z = daily.c.length - 1; while (z >= 0 && daily.c[z] == null) z--;
+    coin.lc = daily.c[z];
     coin.t = TFS.map((tf) => {
       const bars = buildBars(daily, tf, lastClosedDay);
       if (!bars.n) return null;
