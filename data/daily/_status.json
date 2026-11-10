@@ -1,0 +1,98 @@
+{
+ "fetchedAt": "2026-11-02T12:31:11.791Z",
+ "lastClosedDay": "2026-11-01",
+ "mode": "full",
+ "loggedIn": false,
+ "seconds": 355,
+ "total": 563,
+ "ok": 563,
+ "removed": 0,
+ "pruneRefused": 0,
+ "failed": [],
+ "revised": [
+  {
+   "id": "CRYPTO:BNBUSD",
+   "changed": 95,
+   "first": "2021-09-29",
+   "months": 3
+  },
+  {
+   "id": "CRYPTO:ZECUSD",
+   "changed": 0,
+   "weeks": 1
+  },
+  {
+   "id": "CRYPTO:RSRUSD",
+   "changed": 0,
+   "months": 42
+  },
+  {
+   "id": "CRYPTO:USUALUSD",
+   "changed": 0,
+   "months": 2,
+   "weeks": 6
+  },
+  {
+   "id": "CRYPTO:HUNTUSD",
+   "changed": 2,
+   "first": "2026-10-28"
+  },
+  {
+   "id": "CRYPTO:ARPAUSD",
+   "changed": 127,
+   "first": "2024-07-04",
+   "months": 5
+  },
+  {
+   "id": "CRYPTO:METAUSD",
+   "changed": 1,
+   "first": "2026-10-29",
+   "months": 1
+  },
+  {
+   "id": "CRYPTO:HPHUSD",
+   "changed": 510,
+   "first": "2021-01-27",
+   "months": 32,
+   "weeks": 126
+  },
+  {
+   "id": "CRYPTO:GHXUSD",
+   "changed": 333,
+   "first": "2024-01-10"
+  },
+  {
+   "id": "CRYPTO:TDROPUSD",
+   "changed": 1,
+   "first": "2026-10-31"
+  },
+  {
+   "id": "CRYPTO:REIUSD",
+   "changed": 1,
+   "first": "2026-10-27"
+  },
+  {
+   "id": "CRYPTO:LWAUSD",
+   "changed": 1,
+   "first": "2026-10-31",
+   "months": 1
+  },
+  {
+   "id": "CRYPTO:SUNDOGUSD",
+   "changed": 1,
+   "first": "2026-10-30"
+  }
+ ],
+ "oddRanges": [
+  {
+   "id": "CRYPTO:MONADUSD",
+   "bars": 1
+  },
+  {
+   "id": "CRYPTO:LAGRUSD",
+   "bars": 1
+  }
+ ],
+ "monthsVsDaily": [],
+ "weeksVsDaily": []
+}

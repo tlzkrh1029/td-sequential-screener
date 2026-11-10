@@ -1,0 +1,113 @@
+name: Fetch daily OHLC and deploy
+
+# Every day: copy the coin universe from wma0.3-screenshot, fetch the whole daily OHLC history of every USD ticker
+# from TradingView (anonymous chart WebSocket; the daily bar still in progress is dropped), commit it, rebuild the
+# TD Sequential screener and deploy it to GitHub Pages (Settings -> Pages -> Source: GitHub Actions must be on).
+# The whole history is fetched on every run so revisions of old bars reach the screener the same day they reach
+# the TradingView chart; TD counts depend on every earlier bar.
+# TradingView is read without a login (no TV_SESSIONID secrets).
+# Before the build, verify/diff.mjs runs the two independent ports of the indicator (JavaScript and Python) on the
+# day's data and writes verify/out/summary.json, which the page's 검증 screen shows; a mismatch fails the run at the
+# end, and the site is deployed all the same (as with check-fresh).
+# GitHub disables a public repo's schedule after 60 days without activity. The daily data commit is the only
+# activity this repo relies on: never add dummy/keepalive commits or automated "enable workflow" API calls
+# (GitHub took down keepalive-workflow for circumventing that policy). If the schedule is ever disabled,
+# re-enable it by hand in the Actions tab.
+on:
+  schedule:
+    - cron: '23 0 * * *'   # 00:23 UTC = 09:23 KST, after the daily candle closes at 00:00 UTC, clear of the top of the hour
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: fetch-daily-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    outputs:
+      site: ${{ steps.site.outputs.built }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install dependencies
+        run: npm ci --no-audit --no-fund
+
+      # coin matches are fixed in wma0.3-screenshot; a failed copy keeps the committed lists
+      - name: Copy the coin universe from wma0.3-screenshot
+        continue-on-error: true
+        run: node scripts/sync-universe.mjs
+
+      - name: Fetch daily OHLC
+        run: node scripts/fetch-tv.mjs
+
+      - name: Commit data
+        if: ${{ !cancelled() }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898299+github-actions[bot]@users.noreply.github.com"
+          git add -A data/daily data/universe.json data/tickers.json
+          if git diff --cached --quiet; then
+            echo "No data changes"
+          else
+            last=$(node -p "require('./data/daily/_status.json').lastClosedDay")
+            git commit -q -m "Update daily OHLC (closed through $last)"
+            for i in 1 2 3; do
+              if git pull --rebase origin "$GITHUB_REF_NAME" && git push origin "HEAD:$GITHUB_REF_NAME"; then break; fi
+              git rebase --abort 2>/dev/null || true
+              if [ "$i" = 3 ]; then echo "::error::could not push the daily OHLC"; exit 1; fi
+              sleep $((i * 15))
+            done
+          fi
+
+      # both ports on today's data (python3 of the runner, standard library only); the page shows the result
+      - name: Compare the two TD ports on today's data
+        id: verify
+        if: ${{ !cancelled() }}
+        continue-on-error: true
+        run: node verify/diff.mjs --work "$RUNNER_TEMP/td-diff"
+
+      - name: Build site
+        id: site
+        if: ${{ !cancelled() }}
+        run: |
+          node scripts/build-site.mjs dist/site
+          echo "built=yes" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/upload-pages-artifact@v3
+        if: ${{ !cancelled() && steps.site.outputs.built == 'yes' }}
+        with:
+          path: dist/site
+
+      # last, so the site is still built and deployed; a failure here fails the run and notifies the owner
+      - name: Check that the data is fresh
+        if: ${{ !cancelled() }}
+        run: node scripts/check-fresh.mjs
+
+      - name: Fail when the two TD ports disagree
+        if: ${{ !cancelled() && steps.verify.outcome != 'success' }}
+        run: |
+          echo "::error::verify/diff.mjs did not finish with zero mismatches (outcome: ${{ steps.verify.outcome }}); see its log and the page's 검증 screen"
+          exit 1
+
+  deploy:
+    needs: fetch
+    if: ${{ !cancelled() && needs.fetch.outputs.site == 'yes' }}
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
