@@ -1,0 +1,7 @@
+# written by the checks
+out/
+fontcache/
+seeds/base/
+seeds/work/
+evidence/
+try/
