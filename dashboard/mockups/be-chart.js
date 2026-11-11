@@ -61,7 +61,7 @@
   // num / sup: the font sizes of a 9 or 13 and of its superscript; def / supDef: of a +13; lh / lhDef: the height of
   // a number's box; base / rise: the baseline in the box and how far the superscript is raised; chip: the chip's height
   const SIZES = {
-    n: { key: 'n', num: 13, sup: 9, def: 11, supDef: 8, lh: 15, lhDef: 13, base: 12, rise: 4.4, baseDef: 10.4, riseDef: 3.6, chip: 13, chipFont: 10 },
+    n: { key: 'n', num: 13, sup: 9, def: 12, supDef: 9, lh: 15, lhDef: 14, base: 12, rise: 4.4, baseDef: 11.3, riseDef: 4, chip: 13, chipFont: 10 },
     m: { key: 'm', num: 15, sup: 10.5, def: 12, supDef: 9, lh: 17, lhDef: 14, base: 14, rise: 5.2, baseDef: 11.3, riseDef: 4, chip: 14, chipFont: 10.5 },
     l: { key: 'l', num: 17, sup: 11.5, def: 14, supDef: 10, lh: 19, lhDef: 16, base: 15.7, rise: 6, baseDef: 13, riseDef: 4.6, chip: 15, chipFont: 11.5 },
   };
@@ -70,7 +70,7 @@
   const GAP = 3;               // between a candle and the first number or mark
   const CHIP_JOIN = 10;        // stacks whose chips would stand this near share one chip
   const MARK_W = 3, MARK_CAP = 36;   // a mark's width; how far a pile of marks may reach from its candle
-  const LEAD_SIDE = 3;         // a number whose digits stand further than this beside its day gets a line to it
+  const LEAD_SIDE = 1;         // a number whose digits stand further than this beside its day gets a line to it, with a pointer
   const STACK_GAP = 3;         // between the stacks of two days that stand on each other (the numbers of one stack are 1 px apart)
   const NEAR_PX = 40;          // "next to": how near a shorter 13 may not stay written while a 13 of 2W or longer is folded
   const BASE_M = 8;            // room above and under the candles when nothing else needs it
@@ -862,15 +862,18 @@
       // its pile's columns have become marks; a 9 folds into a chip of 9s, or becomes a mark where a 13 has folded.
       // Returns null when nothing that is placed has changed (a number of the stack being placed has folded), else
       // { restart } (marks have changed: the whole side again) or { from: the stack to place again from }.
+      // a 9 or a +13 becomes a mark, and with it every less important 9 and +13 of its own stack: in a stack the less
+      // important number gives way first (a 9 of 10D is never a mark while the 9 of 2D of that day is written)
+      const demote = (y) => { for (const z of y.st ? y.st.list : [y]) if (z.a.kind !== 'C' && !z.dem && (z === y || z.a.imp < y.a.imp)) { z.dem = true; z.fold = false; } };
       const giveWay = (st, x) => {
         if (x.a.kind === 'I') { x.dem = true; return { restart: true }; }
         if (x.a.kind === 'C') {
           const [pa, pb] = pileOf(x);
           let any = false;
-          for (const y of mine) if (y.mode === 'text' && !y.dem && y.a.kind !== 'C' && y.c0 <= pb && pa <= y.c1) { y.dem = true; y.fold = false; any = true; }
+          for (const y of mine) if (y.mode === 'text' && !y.dem && y.a.kind !== 'C' && y.c0 <= pb && pa <= y.c1) { demote(y); any = true; }
           if (any) return { restart: true };
         } else {
-          for (const y of mine) { if (!y.fold || y.a.kind !== 'C') continue; const [pa, pb] = pileOf(y); if (x.c0 <= pb && pa <= x.c1) { x.dem = true; return { restart: true }; } }
+          for (const y of mine) { if (!y.fold || y.a.kind !== 'C') continue; const [pa, pb] = pileOf(y); if (x.c0 <= pb && pa <= x.c1) { demote(x); return { restart: true }; } }
         }
         x.fold = true;
         return x.st === st ? null : { from: x.st };
@@ -878,7 +881,11 @@
       // does a 13 stand in the columns of a more important 13 that has folded?
       const underFolded = (it) => { for (const y of mine) if (y.fold && y.a.kind === 'C' && y.a.imp > it.a.imp && it.k0 <= y.c1 + 2 && y.c0 - 2 <= it.k1) return true; return false; };
       const placeStack = (st) => {
-        const [ca, cb] = dayCols(st.day), own = Math.ceil(top(env, ca, cb));   // where the day's own candle ends
+        // where the day's own candle ends: its own low or high (the pixel columns of its slot would not do: the edge
+        // columns are shared with the days next to it, whose candles can be much taller); in the widest zooms, where a
+        // column of the band holds several days, the band's end over the day's columns
+        const [ca, cb] = dayCols(st.day), v0 = buy ? D.l[st.day - b0] : D.h[st.day - b0];
+        const own = m.lod.candle === 'line' || v0 == null ? Math.ceil(top(env, ca, cb)) : Math.ceil(buy ? Y(v0) + GAP : GAP - Y(v0));
         let keep = st.list.filter((it) => !it.dem && !it.fold);
         st.own = own;
         for (;;) {
@@ -941,14 +948,14 @@
         let changed = false;
         for (const c of sd.chips) {
           if (!c.is13) continue;
-          for (const b of sd.boxes) { const it = b.it; if (it && it.a.kind !== 'C' && b.k0 <= c.k1 && c.k0 <= b.k1) { it.dem = true; changed = true; } }
+          for (const b of sd.boxes) { const it = b.it; if (it && it.a.kind !== 'C' && !it.dem && b.k0 <= c.k1 && c.k0 <= b.k1) { demote(it); changed = true; } }
         }
-        for (const st of stacks[dir]) if (st.chip && st.chip.is13) for (const it of st.list) if (it.fold && it.a.kind !== 'C') { it.fold = false; it.dem = true; changed = true; }
+        for (const st of stacks[dir]) if (st.chip && st.chip.is13) for (const it of st.list) if (it.fold && it.a.kind !== 'C') { demote(it); changed = true; }
         // (a chip of 9s that came to stand on a chip of 13s at the plot's end: its 9s are in that pile)
         for (const c of sd.chips) {
           if (c.is13) continue;
           if (!sd.chips.some((o) => o.is13 && o.k0 <= c.k1 && c.k0 <= o.k1 && o.u < c.u + c.h + 1 && c.u < o.u + o.h + 1)) continue;
-          for (const st of stacks[dir]) if (st.chip === c) for (const it of st.list) if (it.fold) { it.fold = false; it.dem = true; changed = true; }
+          for (const st of stacks[dir]) if (st.chip === c) for (const it of st.list) if (it.fold) { demote(it); changed = true; }
         }
         if (changed) return true;
         for (const b of sd.boxes) { const it = b.it; if (it && it.a.kind === 'C' && underFolded(it)) { it.fold = true; it.placed = false; changed = true; } }
@@ -1079,7 +1086,7 @@
         c.n13 = c.members.filter((it) => it.a.kind === 'C').length; c.n9 = c.members.length - c.n13;
         c.fams = [...new Set(c.members.filter((it) => it.a.kind === 'C').map((it) => it.a.f))].sort((p, q) => p - q);
         c.text = c.n13 ? `13 ${c.n13}개` : `9 ${c.n9}개`;
-        c.y = toY(dir, c.u, c.h); c.lead = c.far > ROW;
+        c.y = toY(dir, c.u, c.h); c.lead = c.far + GAP >= ROW;
         m.chips.push(c);
       }
     }
@@ -1087,7 +1094,7 @@
       if (it.mode === 'none' || (it.dem && !all13)) { it.shown = it.a.kind === 'I' ? 'none' : 'strip'; it.x = it.y = it.w = it.h = 0; }
       else if (it.mode === 'mark' || it.dem) { it.shown = 'mark'; it.y = toY(it.a.dir, it.u, it.h); }
       else if (it.fold && it.chip) { const c = it.chip; it.shown = 'folded'; it.x = c.x; it.y = c.y; it.w = c.w; it.h = c.h; it.group = c.id; }
-      else { it.shown = 'text'; it.y = toY(it.a.dir, it.u, it.h); it.lead = it.far > ROW || Math.abs(it.side) > LEAD_SIDE; }
+      else { it.shown = 'text'; it.y = toY(it.a.dir, it.u, it.h); it.lead = it.far + GAP >= ROW || Math.abs(it.side) > LEAD_SIDE; }
     }
     // a number that stands right on a number of its own stack needs no line of its own: the stack has one, from the
     // candle to the first of them (the same for the chip a stack ends with)
@@ -1584,8 +1591,9 @@
   }
   const boxOf = (t) => (t.type === 'label' ? t.it : t.type === 'chip' ? t.chip : t.type === 'edge' ? t.e : t.type === 'cond' ? { x: t.q.bx, y: t.q.by, w: t.q.bw, h: t.q.bh } : null);
   // a tooltip in words (for the live region): its blocks as sentences, the parts of a block with a space between them
+  // (a block that is a sentence already keeps its one full stop)
   const wordsOf = (n) => (n.children && n.children.length && !/^(B|A|SUP)$/.test(n.tagName) ? [...n.childNodes].map(wordsOf).filter(Boolean).join(' ') : n.textContent.replace(/\s+/g, ' ').trim());
-  const sayOf = (nodes) => nodes.map(wordsOf).filter(Boolean).join('. ');
+  const sayOf = (nodes) => nodes.map(wordsOf).filter(Boolean).map((t) => t.replace(/[.]$/, '')).join('. ');
   // Where a tooltip stands. A number's: beside its stack (right of the widest box of its day and side, left where the
   // window ends), so that it covers no number of that day and side. A condition's: left of the zone. A finger's:
   // above the finger. Otherwise next to the pointer.
