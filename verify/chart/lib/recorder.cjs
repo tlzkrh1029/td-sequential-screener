@@ -1,14 +1,16 @@
 // Canvas recorder and page instrumentation, installed before any script of the page runs (context.addInitScript).
 // It knows nothing of the page's code: it keeps what reaches every canvas. Per canvas the calls since the last full
 // wipe (a fillRect or clearRect over the whole canvas) are "the frame": exactly what is on that canvas now.
-// Kept per call: the arguments, the styles in force, and for fillText the measured ink box of the text.
+// Kept per call: the arguments, the styles in force, and for fillText the measured ink box of the text. Of the very
+// first frame of a canvas the texts are kept as well, with the widths they were painted with.
 module.exports = function installRecorder() {
   if (window.__qa) return;
   const QA = (window.__qa = { opens: [], seq: 0, wipes: 0 });
   const P = CanvasRenderingContext2D.prototype;
   const norm = (c) => (typeof c === 'string' ? c.toLowerCase() : 'obj');
   const r3 = (v) => Math.round(v * 1000) / 1000;
-  const frameOf = (cv) => cv.__qaFrame || (cv.__qaFrame = { n: 0, calls: [] });
+  const frameOf = (cv) => cv.__qaFrame || (cv.__qaFrame = { n: 0, calls: [], first: null });
+  const texts = (calls) => calls.filter((c) => c.op === 'ft').map((c) => ({ text: c.text, font: c.font, mw: c.mw }));
   const scaleOf = (ctx) => { const t = ctx.getTransform(); return [t.a, t.d, t.e, t.f]; };
   const st = (ctx) => ({ fs: norm(ctx.fillStyle), ss: norm(ctx.strokeStyle), al: r3(ctx.globalAlpha), lw: ctx.lineWidth, dash: ctx.getLineDash() });
   const push = (ctx, c) => { const f = frameOf(ctx.canvas); c.i = QA.seq++; const t = scaleOf(ctx); if (t[0] !== (window.devicePixelRatio || 1) || t[2] || t[3]) c.tr = t; f.calls.push(c); };
@@ -16,7 +18,7 @@ module.exports = function installRecorder() {
   for (const name of ['fillRect', 'clearRect', 'strokeRect']) {
     const orig = P[name];
     P[name] = function (x, y, w, h) {
-      if (name !== 'strokeRect' && whole(this, x, y, w, h)) { const f = frameOf(this.canvas); f.n++; f.calls = []; QA.wipes++; }
+      if (name !== 'strokeRect' && whole(this, x, y, w, h)) { const f = frameOf(this.canvas); if (f.n === 1 && !f.first) f.first = texts(f.calls); f.n++; f.calls = []; QA.wipes++; }
       push(this, { op: name === 'fillRect' ? 'fr' : name === 'clearRect' ? 'cr' : 'sr', x, y, w, h, ...st(this) });
       return orig.call(this, x, y, w, h);
     };
@@ -46,6 +48,8 @@ module.exports = function installRecorder() {
   for (const name of ['drawImage', 'putImageData', 'clip', 'save', 'restore', 'translate', 'scale', 'rotate', 'transform']) wrap(name, (ctx) => push(ctx, { op: 'x:' + name }));
   // a chart that is opened in a new tab: kept here, nothing is opened
   window.open = (url, target, features) => { QA.opens.push({ url: String(url), target: target || '', features: features || '' }); return null; };
+  // the texts of a canvas' FIRST frame, with the widths they were painted with (the first paint can come before the fonts)
+  QA.first = (cv) => { if (!cv) return []; const f = frameOf(cv); return f.first || (f.n === 1 ? texts(f.calls) : []); };
   // the frame of a canvas, with the canvas' size in CSS px
   QA.frame = (cv) => { if (!cv) return null; const f = frameOf(cv), r = cv.getBoundingClientRect(); return { n: f.n, w: r.width, h: r.height, pw: cv.width, ph: cv.height, calls: f.calls }; };
 };

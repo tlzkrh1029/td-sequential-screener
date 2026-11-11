@@ -1,7 +1,8 @@
 // Check 10: the published form. The --fragment build inside the host's document (served with index.html and d/0.json
 // only) gives the same picture as the page as its own document: the same probe, the same recorded paint, and the same
-// pixels in full-page screenshots of several states, sizes and themes; it asks its server for nothing but the page and
-// the daily file.
+// pixels in screenshots of several states (first screen, whole history, a dense year, a chip's list, toggles, a
+// tooltip, a pinned tooltip, the 설정 panel, 설명; on a phone the settings and the conditions), sizes and themes; it
+// asks its server for nothing but the page and the daily file.
 //   node published.cjs --base http://127.0.0.1:8911/ --frag http://127.0.0.1:8912/ --out <dir>
 const path = require('path'), fs = require('fs'), { execFileSync } = require('child_process');
 const Q = require('../lib/qa.cjs'), { Model, iso } = require('../lib/model.cjs'), { verifyState } = require('../lib/verify.cjs'), { paintKey } = require('../lib/paint.cjs');
@@ -36,21 +37,43 @@ const A = Q.args();
         for (const k of ['cBase', 'sBase', 'sOver', 'cOver']) C.ok(paintKey(a.frames[k].calls) === paintKey(b.frames[k].calls), `${where} the paint of ${k} differs (${a.frames[k].calls.length} and ${b.frames[k].calls.length} calls)`);
         C.ok(JSON.stringify(a.theme) === JSON.stringify(b.theme), `${where} theme colors differ: ${JSON.stringify(a.theme)} / ${JSON.stringify(b.theme)}`);
         C.ok(a.sw <= a.cw && b.sw <= b.cw, `${where} sideways scroll: page ${a.sw}/${a.cw}, fragment ${b.sw}/${b.cw}`);
-        if (state === 'first' && !dark) { const r = verifyState(M, slug, b, Q.DEFAULT_STATE, { tag: where + ' fragment' }); for (const f of r.fails) if (!/stands further from the candle/.test(f.msg)) C.fail(f.msg); }
+        if (state === 'first') { const r = verifyState(M, slug, b, Q.DEFAULT_STATE, { tag: where + ' fragment' }); for (const f of r.fails) C.fail(f.msg); }
       };
       await compare('first');
       await both((pg) => Q.preset(pg, '전체')); await compare('all');
       if (!touch) {
         await both(async (pg) => { await Q.preset(pg, '1년'); await Q.setState(pg, { def: 'on' }); await Q.centerOn(pg, Q.dayOf('2021-03-01')); }); await compare('2021');
+        // the list of a chip, pinned beside it (the first chip of that dense year)
+        {
+          const lists = [];
+          for (const p of pages) { const pg = p.ctx.page, s = await Q.snap(pg, { nobase: true }), f = s.probe.folds[0]; if (f) await pg.mouse.click(s.rc.x + f.x + f.w / 2, s.rc.y + f.y + f.h / 2); await Q.mouseOff(pg); lists.push(await Q.list(pg)); await pg.screenshot({ path: path.join(dir, `${tag}-${slug}-chiplist-${p.name}.png`) }); await pg.keyboard.press('Escape'); await pg.mouse.click(s.rc.x + 30, s.rc.y - 14); }
+          C.count('states'); C.ok(lists[0] && lists[1] && JSON.stringify(lists[0]) === JSON.stringify(lists[1]), `[${tag} ${slug}] the list of a chip differs between the page and the fragment`);
+        }
         await both(async (pg) => { await Q.setState(pg, { def: 'off', dir: 'sell', fam: [0, 3], cond: 'off' }); await Q.preset(pg, '2년'); }); await compare('toggles');
-        // a tooltip in view
+        // a tooltip in view, then pinned by a click
         await both(async (pg) => { await Q.setState(pg, { ...Q.DEFAULT_STATE }); await Q.preset(pg, '6개월'); });
-        const tips = [];
-        for (const p of pages) { const s = await Q.snap(p.ctx.page, { nobase: true }), L = s.probe.labels.find((x) => x.shown === 'text'); if (L) await p.ctx.page.mouse.move(s.rc.x + L.x + L.w / 2, s.rc.y + L.y + L.h / 2); tips.push(await Q.tip(p.ctx.page)); await p.ctx.page.screenshot({ path: path.join(dir, `${tag}-${slug}-tooltip-${p.name}.png`) }); }
-        C.count('states'); C.ok(tips[0] && tips[1] && JSON.stringify(tips[0]) === JSON.stringify(tips[1]), `[${tag} ${slug}] the tooltip differs between the page and the fragment`);
+        const tips = [], pins = [];
+        for (const p of pages) {
+          const pg = p.ctx.page; await Q.mouseOff(pg);
+          const s = await Q.snap(pg, { nobase: true }), L = s.probe.labels.find((x) => x.shown === 'text'), at = L ? [s.rc.x + L.x + L.w / 2, s.rc.y + L.y + L.h / 2] : null;
+          if (at) await pg.mouse.move(...at); tips.push(await Q.tip(pg)); await pg.screenshot({ path: path.join(dir, `${tag}-${slug}-tooltip-${p.name}.png`) });
+          if (at) await pg.mouse.click(...at); await pg.mouse.move(2, 2); pins.push(await Q.tip(pg)); await pg.screenshot({ path: path.join(dir, `${tag}-${slug}-pinned-${p.name}.png`) });
+          await pg.mouse.click(s.rc.x + 30, s.rc.y - 14);
+        }
+        C.count('states', 2);
+        C.ok(tips[0] && tips[1] && JSON.stringify(tips[0]) === JSON.stringify(tips[1]), `[${tag} ${slug}] the tooltip differs between the page and the fragment`);
+        C.ok(pins[0] && pins[1] && pins[0].pin && JSON.stringify(pins[0]) === JSON.stringify(pins[1]), `[${tag} ${slug}] the pinned tooltip differs between the page and the fragment`);
+        // the 설정 panel and 설명, open
+        for (const [sel, name] of [['#stage-root .bec-more', 'settings'], ['#noteBtn', 'help']]) {
+          for (const p of pages) { const pg = p.ctx.page; await pg.click(sel); await Q.mouseOff(pg); await pg.screenshot({ path: path.join(dir, `${tag}-${slug}-${name}-${p.name}.png`) }); await pg.click(sel); }
+          C.count('states');
+        }
       } else {
         // (opened without a finger: after a tap the button may or may not keep its pressed look, from one run to the next)
         await both(async (pg) => { await pg.evaluate(() => document.querySelector('.bec-more').click()); }); await compare('settings');
+        await both(async (pg) => { await pg.evaluate(() => document.querySelector('.bec-more').click()); });
+        // the conditions under the chart, opened
+        await both(async (pg) => { await pg.evaluate(() => { const b = document.querySelector('.bec-conds .bec-csum'); if (b) b.click(); }); }); await compare('conditions');
       }
       // what the fragment asked its own server for
       const mine = pages[1].ctx.requests.map((r) => r.url).filter((u) => u.startsWith(frag)).map((u) => u.slice(frag.length).replace(/\?v=.*$/, '?v'));

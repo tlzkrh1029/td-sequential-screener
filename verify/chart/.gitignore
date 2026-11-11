@@ -1,7 +1,4 @@
-# written by the checks
+# The checks write nothing here by default (run.sh --out and its fonts' copy are in the system's temporary folder).
+# These cover an output folder that is named inside this one.
 out/
 fontcache/
-seeds/base/
-seeds/work/
-evidence/
-try/

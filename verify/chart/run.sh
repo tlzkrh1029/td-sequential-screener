@@ -1,37 +1,54 @@
 #!/bin/bash
-# The bird eye chart, checked against the engine, in one run.
+# The Bird Eye chart (dashboard/mockups/be-chart.js), checked against the engine and against the rules of its picture,
+# in one run.
 #
-#   run.sh <repoDir> [--out <dir>] [--port <8911..8918>] [--quick] [--only <check,check>] [--coins BTC,ETH]
+#   run.sh <repoDir> [--out <dir>] [--port <n>] [--quick] [--only <check,check>] [--coins BTC,ETH]
 #
 # Builds the owner's page (and its published --fragment form inside the host's document) from <repoDir>, serves both
-# on 127.0.0.1:<port> and <port>+1, computes the expectations in Node from the repository's own modules and data
-# (lib/expect.mjs), runs every check and prints one PASS / FAIL line per check with its totals. Exit code 0 only when
-# every line is PASS. Nothing is written into <repoDir>; everything goes to <out> (default: out/latest next to this file).
+# on 127.0.0.1:<port> and <port>+1 (default 8911 and 8912), computes the expectations in Node from the repository's
+# own modules and data (lib/expect.mjs), runs every check and prints one PASS / FAIL line per check with its totals.
+# Exit code 0 only when every line is PASS.
 #
-#   checks (names for --only):  sweep     c00_base c01_identity c02_anchor c03_painted c04_geometry
-#                               folds     c01_folds            strip     c05_strip
-#                               conds     c06_conditions       tooltips  c07_tooltips
-#                               known     c08_known_label      controls  c09_controls
-#                               published c10_published        screens   c12_other_screens
-#                               fonts     c13_fonts_settle     copy      c14_copy
-#                               asof      c15_conditions_other_days
+# Nothing is written into <repoDir>. Everything goes to <out>: the two builds, the expectations, logs/, one
+# <check>.json per line with every failure message, screenshots, and fontcache/ (the web fonts, fetched once from the
+# font hosts and served from there afterwards; another folder can be named with QA_FONTCACHE). The default <out> is
+# <the system's temporary folder>/td-bird-eye-check/latest, outside the repository.
+#
+#   checks (names for --only) and the lines they print:
+#     sweep        c00_base c01_identity c02_anchor c03_painted c04_geometry c11_piles
+#     folds        c01_folds                     strip        c05_strip
+#     conds        c06_conditions                tooltips     c07_tooltips
+#     known        c08_known_label               controls     c09_controls
+#     published    c10_published                 screens      c12_other_screens
+#     fonts        c13_fonts_settle              copy         c14_copy
+#     asof         c15_conditions_other_days     firstscreen  c16_first_screen
 #   --quick   the short form of every check (for a first look; the totals are smaller)
-# The servers started here are stopped by their process ids when the run ends.
+# The servers started here are stopped by their process ids when the run ends. Needs node, python3 (with Pillow and
+# numpy, for the pixel comparison of the published form) and the playwright package with its Chromium.
 set -u
 QA="$(cd "$(dirname "$0")" && pwd)"
-REPO=""; OUT="$QA/out/latest"; PORT=8911; QUICK=""; ONLY=""; COINS="BTC,ETH"
+REPO=""; OUT="${TMPDIR:-/tmp}/td-bird-eye-check/latest"; PORT=8911; QUICK=""; ONLY=""; COINS="BTC,ETH"
+USAGE="usage: run.sh <repoDir> [--out dir] [--port n] [--quick] [--only names] [--coins BTC,ETH]"
 while [ $# -gt 0 ]; do
   case "$1" in
     --out) OUT="$2"; shift 2;; --port) PORT="$2"; shift 2;; --quick) QUICK="--quick"; shift;; --only) ONLY="$2"; shift 2;; --coins) COINS="$2"; shift 2;;
-    -*) echo "unknown option $1" >&2; exit 2;; *) REPO="$1"; shift;;
+    -h|--help) sed -n '2,27p' "$0" | sed 's/^# \{0,1\}//'; exit 0;;
+    -*) echo "unknown option $1" >&2; echo "$USAGE" >&2; exit 2;; *) REPO="$1"; shift;;
   esac
 done
-[ -n "$REPO" ] && [ -f "$REPO/scripts/build-site.mjs" ] || { echo "usage: run.sh <repoDir> [--out dir] [--port n] [--quick] [--only names]" >&2; exit 2; }
-case "$PORT" in 8911|8912|8913|8914|8915|8916|8917|8918) ;; *) echo "--port must be 8911..8918 (the next port is used too)" >&2; exit 2;; esac
+[ -n "$REPO" ] && [ -f "$REPO/scripts/build-site.mjs" ] || { echo "$USAGE" >&2; exit 2; }
+case "$PORT" in ''|*[!0-9]*) echo "--port must be a number (the next port is used too)" >&2; exit 2;; esac
+[ "$PORT" -ge 1024 ] && [ "$PORT" -le 65534 ] || { echo "--port must be between 1024 and 65534 (the next port is used too)" >&2; exit 2; }
 REPO="$(cd "$REPO" && pwd)"; mkdir -p "$OUT"; OUT="$(cd "$OUT" && pwd)"
-rm -rf "$OUT"/site "$OUT"/fragbuild "$OUT"/frag "$OUT"/logs "$OUT"/*.json "$OUT"/pub "$OUT"/screens "$OUT"/dump "$OUT"/dump-known; mkdir -p "$OUT/logs"
+export QA_FONTCACHE="${QA_FONTCACHE:-$OUT/fontcache}"
+# (what an earlier run left in <out>; the fonts' copy stays)
+for d in site fragbuild frag logs pub screens dump dump-known asof; do [ -e "$OUT/$d" ] && rm -rf "${OUT:?}/$d"; done
+rm -f "$OUT"/*.json "$OUT"/*.png; mkdir -p "$OUT/logs"
 T0=$(date +%s)
-echo "run.sh: repository $REPO ($(cd "$REPO" && git rev-parse --short HEAD 2>/dev/null || echo 'no git')), output $OUT, ports $PORT and $((PORT + 1))${QUICK:+, quick}"
+HEAD_IS="$(cd "$REPO" && git rev-parse --short HEAD 2>/dev/null || echo 'no git')"
+# (the page is built from the files as they are: say so when they differ from that commit)
+[ "$HEAD_IS" != "no git" ] && [ -n "$(cd "$REPO" && git status --porcelain --untracked-files=no 2>/dev/null)" ] && HEAD_IS="$HEAD_IS with uncommitted changes"
+echo "run.sh: repository $REPO ($HEAD_IS), output $OUT, ports $PORT and $((PORT + 1))${QUICK:+, quick}"
 
 # ---- build: the page as its own document, and the published fragment inside the host's document ----
 BUILD=(--template dashboard/mockups/birdeye.html --chunk 8 --includes be-chart --coins "$COINS")
@@ -54,15 +71,19 @@ python3 -m http.server --directory "$OUT/frag" --bind 127.0.0.1 "$((PORT + 1))" 
 BASE="http://127.0.0.1:$PORT/"; FRAG="http://127.0.0.1:$((PORT + 1))/"
 for i in $(seq 1 50); do curl -s -o /dev/null "$BASE" && curl -s -o /dev/null "$FRAG" && break; sleep 0.1; done
 curl -s -o /dev/null "$BASE" || { echo "FAIL serve: nothing answers on $BASE (is the port taken?)"; exit 1; }
+# (the two addresses have to be the servers started here, not something else that listens there)
+kill -0 "${PIDS[0]}" 2>/dev/null && kill -0 "${PIDS[1]}" 2>/dev/null || { echo "FAIL serve: a server did not start on $PORT or $((PORT + 1)) (is the port taken?)"; exit 1; }
 
 # ---- the checks, in three lanes side by side; their lines are printed in order at the end ----
 ARGS=(--base "$BASE" --out "$OUT" --expect "$OUT/expect.json" --repo "$REPO" --frag "$FRAG")
 [ -n "$QUICK" ] && ARGS+=(--quick)
+NAMES="sweep folds strip conds tooltips known controls published screens fonts copy asof firstscreen"
+for n in ${ONLY//,/ }; do case " $NAMES " in *" $n "*) ;; *) echo "unknown check \"$n\" (the checks: $NAMES)" >&2; exit 2;; esac; done
 want() { [ -z "$ONLY" ] || case ",$ONLY," in *",$1,"*) return 0;; *) return 1;; esac; }
 run() { local name="$1"; want "$name" || return 0; node "$QA/checks/$name.cjs" "${ARGS[@]}" > "$OUT/logs/$name.out" 2> "$OUT/logs/$name.err"; echo $? > "$OUT/logs/$name.code"; }
 ( run sweep; run known; run conds; run tooltips; run copy ) &
 L1=$!
-( run screens; run strip; run folds ) &
+( run screens; run strip; run folds; run firstscreen ) &
 L2=$!
 ( run controls; run published; run asof ) &
 L3=$!
@@ -70,7 +91,7 @@ wait $L1 $L2 $L3
 # (the font check measures a race in the page's own timing: it runs alone, when the machine is quiet)
 run fonts
 RC=0; LINES=0; FAILS=0
-for name in sweep folds strip conds tooltips known controls published screens fonts copy asof; do
+for name in $NAMES; do
   want "$name" || continue
   if [ ! -s "$OUT/logs/$name.out" ] || [ "$(cat "$OUT/logs/$name.code" 2>/dev/null)" = "3" ]; then echo "FAIL $name: the check did not finish: $(tail -c 600 "$OUT/logs/$name.err" | tr '\n' ' ')"; RC=1; FAILS=$((FAILS + 1)); LINES=$((LINES + 1)); continue; fi
   cat "$OUT/logs/$name.out"

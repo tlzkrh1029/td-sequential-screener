@@ -113,6 +113,12 @@ node verify/diff.mjs
 node verify/triggers-check.mjs
 ```
 
+Bird Eye 차트 페이지를 검사합니다. 페이지를 빌드해서 브라우저로 열고, 화면에 그려진 숫자를 엔진의 결과와 비교하고, 숫자가 놓이는 규칙을 확인합니다. 검사마다 PASS나 FAIL을 한 줄로 출력합니다. 결과 파일은 `--out`으로 정한 폴더에 쓰고, `--out`이 없으면 시스템 임시 폴더에 씁니다. `playwright` 패키지와 그 Chromium, Python의 Pillow와 numpy가 있어야 합니다.
+
+```bash
+verify/chart/run.sh . --out /tmp/td-bird-eye-check
+```
+
 한 티커의 라벨 목록을 파일로 봅니다.
 
 ```bash
@@ -150,7 +156,7 @@ node scripts/td-dump.mjs --out /tmp/td-dump --tickers CRYPTO:BTCUSD --tfs 2W
 - `dashboard/td-view.js`: 다음 봉 조건이 충족되는 가격과, 화면에 쓰는 타임프레임별 상태를 계산합니다.
 - `dashboard/mockups/`: Bird Eye 시안입니다. 화면 틀(`birdeye.html`), Bird Eye 차트(`be-chart.js`), 먼저 만든 시안 여섯 개(`be-<화면>-<a|b>.js`)가 있습니다.
 - `scripts/`: 수집(`fetch-tv.mjs`), 종목 목록 복사(`sync-universe.mjs`), 빌드(`build-site.mjs`), 신선도 검사(`check-fresh.mjs`), 라벨 덤프(`td-dump.mjs`)가 있습니다.
-- `verify/`: Python 참조 구현(`ref/`), 두 구현 비교(`diff.mjs`, `fuzz.mjs`), 자체 봉 비교(`native/`), 다음 봉 조건 검사(`triggers-check.mjs`), 결과 파일(`out/`)이 있습니다.
+- `verify/`: Python 참조 구현(`ref/`), 두 구현 비교(`diff.mjs`, `fuzz.mjs`), 자체 봉 비교(`native/`), 다음 봉 조건 검사(`triggers-check.mjs`), Bird Eye 차트 검사(`chart/`), 결과 파일(`out/`)이 있습니다.
 - `test/`: Node 테스트입니다.
 - `data/`: 종목 목록(`universe.json`, `tickers.json`)과 일봉 데이터(`daily/`)입니다.
 

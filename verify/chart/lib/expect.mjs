@@ -94,7 +94,14 @@ function fireByRecount(bars, base, t) {
   let q = p;
   const lo = Math.min(c0, p), hi = Math.max(c0, p);
   for (const v of [...vals, c0].filter((v) => v >= lo && v <= hi).sort((a, b) => Math.abs(a - c0) - Math.abs(b - c0))) { if (there(straight(base, v, p))) { q = v; break; } }
-  return { now: false, p, q };
+  // The LEVEL a text has to name for p and for q, found with the engine alone: a number the trigger names at which the
+  // engine prints the label (the level counts itself), or the number next to which it first prints it (a strict
+  // comparison: the label appears only beyond the level). pl: of p; ql: of q, null when the bar may close where it is.
+  const raw = new Set();
+  for (const g of [t.all || [], ...(t.any || []), ...(t.unless || [])]) for (const [src, , v] of g) { if (src === 'hl') { raw.add(base.l + v); raw.add(base.h - v); } else raw.add(v); }
+  const dir = p < c0 ? -1 : 1;
+  const levelOf = (x) => { if (raw.has(x)) return { v: x, strict: false }; for (const r of raw) if (VIEW.nextAfter(r, dir) === x) return { v: r, strict: true }; return null; };
+  return { now: false, p, q, dir, pl: levelOf(p), ql: q === p ? levelOf(p) : q === c0 ? null : levelOf(q) };
 }
 // a scan that knows nothing of the triggers: closes on a fine grid around the current price, the bar going straight to
 // each; which 9s and 13s the engine prints, and the grid price nearest to the current one at which each first appears
