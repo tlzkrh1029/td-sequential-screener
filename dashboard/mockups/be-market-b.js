@@ -132,13 +132,16 @@
     else if (t.unless && t.unless.length) s += ` 다만 ${t.unless.map(groupText).join('이거나 ')}이면 나오지 않습니다.`;
     return s;
   }
-  // where the bar in progress stands against one trigger (td-view.js fire)
+  // where the bar in progress stands against one trigger (td-view.js fire). A strict level (fire's pc / qc: the label
+  // appears only beyond it, as for a waiting 9) is named with 초과 or 미만, never as a price at which the bar may close.
   function fireText(f) {
     if (!f) return '가격이 한 번 움직여서는 충족되지 않음';
     if (f.now) return '지금 값으로 충족';
-    const s = `조건가 ${fmtPrice(f.p)} (${fmtPct(f.pct)})`;
-    if (f.q === f.p) return s + ' · 이 값에서 마감하면 충족';
-    return s + (f.qpct === 0 ? ' · 닿은 뒤 지금 가격에서 마감해도 충족' : ` · 닿은 뒤 ${fmtPrice(f.q)} (${fmtPct(f.qpct)})에서 마감해도 충족`);
+    const strict = (c) => !!(c && c.strict);
+    const at = (c, p, pct) => `${strict(c) ? `${fmtPrice(c.v)} ${c.op === '>' ? '초과' : '미만'}` : fmtPrice(p)} (${fmtPct(pct)})`;
+    const s = `조건가 ${at(f.pc, f.p, f.pct)}`;
+    if (f.q === f.p) return s + (strict(f.pc) ? ` · 이 값보다 ${f.pc.op === '>' ? '높게' : '낮게'} 마감하면 충족` : ' · 이 값에서 마감하면 충족');
+    return s + (f.qpct === 0 ? ' · 닿은 뒤 지금 가격에서 마감해도 충족' : ` · 닿은 뒤 ${at(f.qc, f.q, f.qpct)}에서 마감해도 충족`);
   }
 
   // ---------- tooltips ----------

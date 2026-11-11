@@ -455,13 +455,17 @@
     }
   }
   const labelName = (L) => (L.kind === 'C' ? `${FAM_NAME[L.f]} 13 완성` : L.kind === 'I' ? `${FAM_NAME[L.f]} 13 미뤄짐` : L.rep ? '반복 9' : L.text === '9*' ? '셋업 9 (퍼펙트)' : '셋업 9');
-  // where the bar in progress stands against one trigger (td-view.js fire): [the price it has to reach, what holds after that]
+  // where the bar in progress stands against one trigger (td-view.js fire): [the price it has to reach, what holds after that].
+  // A strict level (fire's pc / qc: the label appears only beyond it, as for a waiting 9) is named with 초과 or 미만,
+  // never as a price at which the bar may close.
   function fireText(f) {
     if (!f) return ['가격이 한 번 움직여서는 충족되지 않음', ''];
     if (f.now) return ['<b>지금 값으로 충족</b>', ''];
-    const at = (p, pct) => `<span class="num nb">${fmtPrice(p)} (${fmtPct(pct)})</span>`;
-    return [`조건가 ${at(f.p, f.pct)}`,
-      f.q === f.p ? '이 값에서 마감하면 충족' : f.qpct === 0 ? '닿은 뒤 지금 가격에서 마감해도 충족' : `닿은 뒤 ${at(f.q, f.qpct)}에서 마감해도 충족`];
+    const strict = (c) => !!(c && c.strict);
+    const at = (c, p, pct) => `<span class="num nb">${strict(c) ? `${fmtPrice(c.v)} ${c.op === '>' ? '초과' : '미만'}` : fmtPrice(p)} (${fmtPct(pct)})</span>`;
+    return [`조건가 ${at(f.pc, f.p, f.pct)}`,
+      f.q === f.p ? (strict(f.pc) ? `이 값보다 ${f.pc.op === '>' ? '높게' : '낮게'} 마감하면 충족` : '이 값에서 마감하면 충족')
+        : f.qpct === 0 ? '닿은 뒤 지금 가격에서 마감해도 충족' : `닿은 뒤 ${at(f.qc, f.q, f.qpct)}에서 마감해도 충족`];
   }
   const fireKey = (x) => (!x.fire ? Infinity : x.fire.now ? -1 : Math.abs(x.fire.pct));
   // one side of one timeframe: the labels on the bars of the chosen period, the counts that are running, the next-bar conditions
