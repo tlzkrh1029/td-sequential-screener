@@ -47,7 +47,7 @@ function breakpoints(trigger, base) {
 
 // Where the bar in progress stands against one next-bar trigger.
 //   fire(evalTrigger, trigger, base) -> null when no single move of the price makes the label appear, else
-//   { now, p, pct, q, qpct, dir }
+//   { now, p, pct, q, qpct, dir, pc, qc }
 //     now   the label appears if the bar closes where it is now
 //     p     the close nearest to the current one at which the label appears when the price goes straight there and
 //           the bar closes there. For a 13 this is how far the low (buy) or the high (sell) has to reach.
@@ -56,13 +56,20 @@ function breakpoints(trigger, base) {
 //           that needs the low at one level and the close at another has q at the close level; otherwise q = p.
 //     qpct  q / current close - 1
 //     dir   -1 the price has to fall to p, 1 it has to rise, 0 the label appears as things are
+//     pc    the comparison that decides at p: { src, op, v, strict }. v is the level: the threshold of the trigger the
+//           price has to come to. strict: the label does not appear AT the level, only beyond it (p is then the double
+//           next to v; a waiting 9 needs the close beyond the close of four bars before). op is what the price has to
+//           be against v on its way from the current close: '<=' or '<' when it falls, '>=' or '>' when it rises. src
+//           is the price the trigger compares there ('l' | 'h' | 'c', 'hl' for a range condition). A text has to name
+//           v with op ("60,492.4 초과"), never p as a price at which the bar may close. null when now.
+//     qc    the same at q; pc itself when q = p; null when now, and when the bar may close where it is now (qpct = 0)
 // evalTrigger is TD.evalTrigger; base is baseBar(...). Everything is exact in floating point: the label appears at p
 // and at q, and at no close nearer to the current one (test/view.test.mjs checks this against the engine itself).
 export function fire(evalTrigger, trigger, base) {
   const c0 = base.c;
   if (!(c0 > 0)) return null;
   const now = evalTrigger(trigger, { o: base.o, h: base.h, l: base.l, c: base.c });
-  if (now) return { now: true, p: c0, pct: 0, q: c0, qpct: 0, dir: 0 };
+  if (now) return { now: true, p: c0, pct: 0, q: c0, qpct: 0, dir: 0, pc: null, qc: null };
   const cand = breakpoints(trigger, base);
   let p = null;
   for (const v of cand) {
@@ -77,7 +84,31 @@ export function fire(evalTrigger, trigger, base) {
     if (v < lo || v > hi || Math.abs(v - c0) >= Math.abs(q - c0)) continue;
     if (evalTrigger(trigger, extendBar(base, v, p))) q = v;
   }
-  return { now: false, p, pct: p / c0 - 1, q, qpct: q / c0 - 1, dir: p < c0 ? -1 : 1 };
+  const dir = p < c0 ? -1 : 1, wick = dir < 0 ? 'l' : 'h';
+  const pc = decides(trigger, base, p, dir, q === p ? ['c', wick, 'hl'] : [wick, 'c', 'hl']);
+  const qc = q === p ? pc : q === c0 ? null : decides(trigger, base, q, dir, ['c', wick, 'hl']);
+  return { now: false, p, pct: p / c0 - 1, q, qpct: q / c0 - 1, dir, pc, qc };
+}
+
+// The comparison that decides at the close x (fire's p or q), reached from the current close in direction dir: the
+// level of the trigger that x is at (the label appears at the level itself) or one double beyond (a strict comparison:
+// it appears only beyond the level). Of several conditions with that level the first source in `prefer` is named.
+// A close that is at no level of the trigger (not seen with the engine's triggers) is its own level.
+function decides(trigger, base, x, dir, prefer) {
+  const op = (strict) => (dir < 0 ? (strict ? '<' : '<=') : (strict ? '>' : '>='));
+  let best = null, rank = Infinity;
+  for (const g of [trigger.all || [], ...(trigger.any || []), ...(trigger.unless || [])]) {
+    for (const [src, , v] of g) {
+      const levels = src === 'c' || src === 'l' || src === 'h' ? [v] : src === 'hl' ? [base.l + v, base.h - v] : [];
+      for (const level of levels) {
+        const strict = x !== level;
+        if (strict && x !== nextAfter(level, dir)) continue;
+        const i = prefer.indexOf(src), r = (i < 0 ? prefer.length : i) * 2 + (strict ? 1 : 0);
+        if (r < rank) { rank = r; best = { src, op: op(strict), v: level, strict }; }
+      }
+    }
+  }
+  return best || { src: 'c', op: op(false), v: x, strict: false };
 }
 
 // The triggers of one timeframe with where the bar stands against each: [{ t, k, d, f, o, fire }], fire as above

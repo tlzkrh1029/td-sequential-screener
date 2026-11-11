@@ -36,11 +36,11 @@
 - **종목 상세.** 캔들 차트에 지표가 그리는 위치와 크기로 라벨을 그립니다. 지표는 차트에 라벨을 최근 400개까지만 남기므로, TradingView 차트에서 지워지는 오래된 라벨은 흐리게 그립니다. 20개 타임프레임의 9와 13을 한 날짜 축에 모은 바코드, 타임프레임별 상태와 다음 봉 조건, 전체 라벨 목록도 있습니다.
 - **검증.** 데이터 신선도, 두 구현의 비교 결과, 차트와 맞춰 볼 신호, 알아 둘 점을 보여 줍니다. 마지막으로 마감된 일봉이 끝난 지 36시간이 넘으면 모든 화면에 빨간 경고가 나옵니다.
 
-## Bird eye 시안
+## Bird Eye 시안
 
-`dashboard/mockups/`에는 Bird eye 화면의 시안이 있습니다. 스크리너와 같은 데이터를 같은 엔진으로 셉니다.
+`dashboard/mockups/`에는 Bird Eye 화면의 시안이 있습니다. 스크리너와 같은 데이터를 같은 엔진으로 셉니다.
 
-- **Bird eye 차트.** 한 종목의 일봉 차트 한 장에 20개 타임프레임의 9와 13을 숫자로 적습니다. 숫자는 그 타임프레임 봉의 마지막 날 자리에 있고, 위 첨자가 타임프레임, 색이 계열입니다. 위의 조감 띠는 전체 기간에서 9와 13이 나온 자리를 타임프레임마다 한 줄로 보여 주고, 차트 오른쪽 끝에는 다음 봉 조건이 있습니다. 지금은 BTC와 ETH에 먼저 적용합니다.
+- **Bird Eye 차트.** 한 종목의 일봉 차트 한 장에 20개 타임프레임의 9와 13을 숫자로 적습니다. 숫자는 그 타임프레임 봉의 마지막 날 자리에 있고, 위 첨자가 타임프레임, 색이 계열입니다. 숫자의 크기는 모든 타임프레임이 같습니다. 숫자가 한곳에 몰리면 긴 타임프레임의 13부터 적고, 자리가 모자란 숫자는 "13 7개" 같은 칩으로 접습니다. 칩을 누르면 접힌 숫자의 목록이 열립니다. 기간을 넓히면 짧은 타임프레임의 숫자부터 작은 색 표시로 바뀝니다. 위의 전체 기간 띠는 9와 13이 나온 자리를 타임프레임마다 한 줄로 보여 주고, 차트 오른쪽 끝에는 다음 봉 조건이 있습니다. 지금은 BTC와 ETH에 먼저 적용합니다.
 
 아래 세 화면은 먼저 만든 시안이고, 화면마다 두 가지 방식이 있습니다.
 
@@ -48,14 +48,14 @@
 - **여러 TF 한 장.** 한 종목의 20개 타임프레임을 한 장에 보여 줍니다. A는 격자 시트이고, B는 시간 정렬 레인입니다.
 - **TF 사다리.** 한 종목의 타임프레임마다 9와 13까지의 진행 상황과 조건가를 보여 줍니다. A는 진행 게이지이고, B는 가격 사다리입니다.
 
-`birdeye.html`은 화면 틀과 공통 함수(`BE`)이고, `be-chart.js`가 Bird eye 차트, `be-<화면>-<a|b>.js` 파일 하나가 시안 하나입니다. 페이지는 빌드에 넣은 화면만 보여 줍니다. `dashboard/td-view.js`는 진행 중인 봉이 어느 가격에 닿으면 9나 13이 나오는지를 계산합니다. `test/view.test.mjs`는 그 가격으로 만든 봉을 엔진에 넣고 다시 세어서, 계산한 가격이 맞는지 확인합니다.
+`birdeye.html`은 화면 틀과 공통 함수(`BE`)이고, `be-chart.js`가 Bird Eye 차트, `be-<화면>-<a|b>.js` 파일 하나가 시안 하나입니다. 페이지는 빌드에 넣은 화면만 보여 줍니다. Bird Eye 차트만 넣은 페이지는 화면을 고르는 줄 없이 차트 한 장으로 열립니다. `dashboard/td-view.js`는 진행 중인 봉이 어느 가격에 닿으면 9나 13이 나오는지를 계산하고, 그 가격이 닿으면 되는 값(이상, 이하)인지 넘어야 하는 값(초과, 미만)인지도 함께 알려 줍니다. `test/view.test.mjs`는 그 가격으로 만든 봉을 엔진에 넣고 다시 세어서, 계산한 가격이 맞는지 확인합니다. 넘어야 하는 값은 그 값에 마감한 봉에는 라벨이 나오지 않고 한 틱 넘겨 마감한 봉에는 나오는지도 확인합니다.
 
 시안 페이지를 `dist/birdeye`에 만듭니다. 여는 방법은 아래의 사이트와 같습니다. `--includes`는 페이지에 넣을 화면 파일을 고르고, `--coins`는 페이지와 일봉 파일에 넣을 종목을 고릅니다.
 
 ```bash
 # 모든 화면, 모든 종목
 node scripts/build-site.mjs dist/birdeye --template dashboard/mockups/birdeye.html --chunk 8
-# Bird eye 차트만, BTC와 ETH만 (이 페이지는 index.html과 d/0.json만 읽습니다)
+# Bird Eye 차트만, BTC와 ETH만 (이 페이지는 index.html과 d/0.json만 읽습니다)
 node scripts/build-site.mjs dist/birdeye-chart --template dashboard/mockups/birdeye.html --chunk 8 --includes be-chart --coins BTC,ETH
 ```
 
@@ -148,7 +148,7 @@ node scripts/td-dump.mjs --out /tmp/td-dump --tickers CRYPTO:BTCUSD --tfs 2W
 - `dashboard/td-engine.js`: TD Research v6 엔진과 다음 봉 조건을 계산합니다.
 - `dashboard/screener.html`: 페이지 템플릿입니다. 빌드가 여기에 데이터와 위의 두 모듈을 넣습니다.
 - `dashboard/td-view.js`: 다음 봉 조건이 충족되는 가격과, 화면에 쓰는 타임프레임별 상태를 계산합니다.
-- `dashboard/mockups/`: Bird eye 시안입니다. 화면 틀(`birdeye.html`), Bird eye 차트(`be-chart.js`), 먼저 만든 시안 여섯 개(`be-<화면>-<a|b>.js`)가 있습니다.
+- `dashboard/mockups/`: Bird Eye 시안입니다. 화면 틀(`birdeye.html`), Bird Eye 차트(`be-chart.js`), 먼저 만든 시안 여섯 개(`be-<화면>-<a|b>.js`)가 있습니다.
 - `scripts/`: 수집(`fetch-tv.mjs`), 종목 목록 복사(`sync-universe.mjs`), 빌드(`build-site.mjs`), 신선도 검사(`check-fresh.mjs`), 라벨 덤프(`td-dump.mjs`)가 있습니다.
 - `verify/`: Python 참조 구현(`ref/`), 두 구현 비교(`diff.mjs`, `fuzz.mjs`), 자체 봉 비교(`native/`), 다음 봉 조건 검사(`triggers-check.mjs`), 결과 파일(`out/`)이 있습니다.
 - `test/`: Node 테스트입니다.

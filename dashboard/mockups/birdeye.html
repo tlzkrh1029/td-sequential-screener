@@ -118,6 +118,46 @@ body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-a
   .tabs a { padding: 10px 9px 9px; font-size: 13.5px; }
   .coinhead h1 { font-size: 19px; }
 }
+
+/* A page with one view whose variant asks for it (solo: the Bird Eye chart) gives the first screen to the picture: the
+   app bar holds the coin buttons, the newest close, the TradingView link and 설명 in one row and does not stick; the
+   panel of the study shell and the coin head row are not shown; 설명 opens over the page instead of pushing it down. */
+.solo-bar { display: flex; flex: 1 1 auto; flex-wrap: wrap; align-items: center; gap: 2px 14px; min-width: 0; }
+.solo-info { display: inline-flex; flex-wrap: wrap; align-items: baseline; gap: 0 14px; font-size: 12.5px; color: var(--muted); min-width: 0; }
+.solo-info > * { white-space: nowrap; }
+.solo-info .sym, .solo-info .asof2 { display: none; }
+.solo-info b { color: var(--fg); font-weight: 600; }
+.be-solo .appbar { position: static; }
+.be-solo .appbar-in { min-height: 43px; gap: 0 14px; }
+.be-solo .brand small { font-size: 11.5px; margin-left: 5px; }
+.be-solo .wrap { padding-block: 8px 32px; gap: 8px; position: relative; }
+.be-solo #stage, .be-solo #stage-root { gap: 8px !important; }
+.be-solo .coinpick .quick button { padding: 3px 11px; font-size: 12.5px; }
+.be-solo .note-btn { margin-left: auto; }
+.be-solo .vnote { position: absolute; z-index: 30; top: 4px; right: max(20px, env(safe-area-inset-right, 0px)); width: min(600px, calc(100% - 32px)); max-height: calc(100vh - 62px); overflow: auto; padding: 12px 16px 14px; gap: 10px; box-shadow: 0 10px 28px rgb(0 0 0 / .2); }
+.be-solo .vnote h2 { font-size: 14px; }
+.be-solo .vnote h3 { font-size: 12.5px; font-weight: 600; margin: 0 0 2px; }
+.be-solo .vnote p { font-size: 12.5px; line-height: 1.55; color: var(--muted); }
+.be-solo .vnote section { display: grid; gap: 1px; }
+@media (max-width: 720px) {
+  .be-solo .vnote { right: max(16px, env(safe-area-inset-right, 0px)); }
+}
+@media (max-width: 560px) {
+  .be-solo .appbar-in { gap: 0 8px; padding-top: 4px; padding-bottom: 3px; min-height: 0; }
+  .be-solo .solo-bar { display: contents; }
+  .be-solo .brand { padding-top: 0; margin-right: auto; }
+  .be-solo .brand small { display: none; }
+  .be-solo .coinpick .quick button { min-height: 40px; min-width: 46px; padding: 0 12px; font-size: 13px; }
+  .be-solo .note-btn { margin-left: 0; min-height: 40px; padding: 0 12px; }
+  .be-solo .solo-info { flex-basis: 100%; order: 5; font-size: 11.5px; gap: 0 8px; line-height: 20px; }
+  .be-solo .solo-info .sym, .be-solo .solo-info .asof2 { display: inline; }
+  .be-solo .solo-info a { margin-left: auto; padding: 10px 0; margin-block: -10px; }   /* a 40 px high place for the finger; the line keeps its height */
+  .be-solo .wrap { padding-block: 6px 28px; gap: 6px; }
+  .be-solo #stage, .be-solo #stage-root { gap: 6px !important; }
+}
+@media (max-width: 379px) {
+  .be-solo .solo-info .asof2 { display: none; }   /* the line stays one line; the chart's caption has the window's last day */
+}
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { transition: none !important; animation: none !important; scroll-behavior: auto !important; }
 }
@@ -127,11 +167,12 @@ body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-a
   <div class="appbar-in">
     <div class="brand">TD Bird Eye 시안<small id="asof"></small></div>
     <nav class="tabs" aria-label="화면" id="tabs"></nav>
+    <div class="solo-bar" id="soloBar" hidden></div>
   </div>
 </header>
 
 <main class="wrap">
-  <div class="panel controls" role="group" aria-label="시안과 종목 고르기">
+  <div class="panel controls" id="shellCtl" role="group" aria-label="시안과 종목 고르기">
     <div class="ctl" id="varCtl"><span id="lb-var">시안</span><div class="seg" role="group" aria-labelledby="lb-var" id="varSeg"></div></div>
     <div class="ctl" id="coinCtl"><span id="lb-coin">종목</span>
       <div class="coinpick">
@@ -142,7 +183,7 @@ body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-a
         <span class="quick" id="quick"></span>
       </div>
     </div>
-    <div class="ctl"><span id="lb-fam">계열</span><div class="seg fam" role="group" aria-labelledby="lb-fam" id="famSeg"></div></div>
+    <div class="ctl" id="famCtl"><span id="lb-fam">계열</span><div class="seg fam" role="group" aria-labelledby="lb-fam" id="famSeg"></div></div>
     <button type="button" class="btn sm note-btn" id="noteBtn" aria-controls="vnote"></button>
   </div>
   <div class="panel vnote" id="vnote"></div>
@@ -180,7 +221,8 @@ const DATA = /*__DATA__*/null;
 //   BE.side(c, j, dir)  one side of one timeframe of a coin from the summary, cached: VIEW.sideState(...) =
 //                       {raw, to9, runs: [{f, count, hi}], labels: [{ago, kind 'S'|'I'|'C', f, text, raw, rep}],
 //                        trigs: [{t, k 'S9'|'S9r'|'C13', d, f, o, fire}], next13, next9}; fire = VIEW.fire(...) =
-//                       {now, p, pct, q, qpct, dir} | null (see td-view.js). null when the coin has no bar there.
+//                       {now, p, pct, q, qpct, dir, pc, qc} | null (see td-view.js; pc and qc: the level that decides
+//                       at p and at q, and whether it counts itself). null when the coin has no bar there.
 //                       The caller applies the family toggles (BE.famOn(f)).
 //   BE.detail(c)        Promise of one coin recounted in the browser from its daily data (cached):
 //                       {c, d daily data, mintick, last newest daily close, tfs: [per timeframe {tf, j, bars
@@ -195,10 +237,12 @@ const DATA = /*__DATA__*/null;
 //   BE.openCoin(slug, view = 'sheet')   from the market views: show that coin
 //   BE.vstate(id, defaults)             a variant's own settings object, kept in localStorage; BE.save() after a change
 // Drawing
-//   BE.el(tag, cls, text), BE.esc, BE.iso(day), BE.nf, BE.fmtPrice, BE.fmtPct(x), BE.fmtCap
+//   BE.el(tag, cls, text), BE.esc, BE.iso(day), BE.nf, BE.fmtPrice, BE.fmtPct(x), BE.fmtCap, BE.fmtCapKo ("1.71조 달러")
 //   BE.chipHTML(kind, text, f) / BE.chipEl(...)   the screener's marks: 'C' 13 chip, 'S' 9 chip, 'I' +13
 //   BE.seg(label, [[value, text], ...], get, set)  a labelled segmented control (returns the .ctl element)
-//   BE.tip.show(x, y, nodes | html), BE.tip.hide()
+//   BE.tip.show(x, y, nodes | html) next to a pointer at x, y; BE.tip.at(nodes | html, place) where the caller
+//                       says: place(width, height) -> [left, top] in the window, held inside it; BE.tip.hide();
+//                       BE.tip.el the element (pointer-events: none unless a variant sets it for a pinned tip)
 //   BE.setupCanvas(cv, w, h) -> ctx (device pixel ratio handled); BE.C canvas colors of the current theme
 //   BE.padArray(bars, mintick), BE.labelPrice(L, bars, pad), BE.labelColor(L), BE.LABEL_FONT   where and how the
 //                       indicator draws a label (as the screener's coin chart)
@@ -207,14 +251,24 @@ const DATA = /*__DATA__*/null;
 //   BE.hrefOf(view, slug) the hash of a coin in a view (with the variant last shown there), BE.isDark(),
 //   BE.findCoins(text) the coins a search text means, BE.lastBar(j) {ls, le, coins} the last confirmed bar most coins
 //   have on timeframe j, BE.isLate(c, j) the coin's last confirmed bar there is older than that
-//   BE.trigText(t) a next-bar trigger as a sentence; BE.fireText(fire) where the bar in progress stands against it
-//   The root element carries --appbar-h, the height of the sticky app bar.
+//   BE.trigText(t) a next-bar trigger as a sentence; BE.fireText(fire) where the bar in progress stands against it:
+//   the level with its comparison, "조건가 60,492.4 초과 (+3.9%)", and the close level after it when there is one
+//   The root element carries --appbar-h, the height of the app bar.
+//   BE.solo             true on a page that gives its first screen to one view (see below); BE.famCtl is then the
+//                       계열 control (label and toggles) for the view to put into its own row of controls
 // A variant
 //   BE.register({ view, key, name, blurb, good: [..], weak: [..], mount(root), render(why), unmount() })
 //     mount(root)   build the variant's DOM inside root (an empty element); called each time the variant is shown
 //     render(why)   draw from the shared state; called after mount and on 'coin', 'fam', 'theme', 'resize'
 //     unmount()     optional: stop timers, drop listeners outside root
 //   good and weak may be left out: the description then shows the blurb alone, and stays folded until it is asked for.
+//   solo: true      the variant wants the first screen for its picture. When it is the only variant of the only view
+//                   of the page, the shell becomes one app bar row that does not stick (name, closing day, coin
+//                   buttons, newest close, TradingView link, 설명); the panel of the study shell and the coin head row
+//                   are not shown, and the variant takes BE.famCtl into its controls. 설명 then opens over the page:
+//   help()          optional, for a solo page: the nodes of the 설명 panel (asked for each time it opens)
+//   lateFonts: true optional: render('theme') is called again whenever fonts finish loading later (a variant that
+//                   draws text on a canvas and keeps what is pointed at while it draws)
 // The page shows what was registered: a tab per view that has a variant (none when there is one view), the variant
 // switch where a view has two, and the first such view when the address names none.
 // ====================================================================================================================
@@ -277,9 +331,25 @@ const BE = (() => {
     const [d, u] = v >= 1e12 ? [1e12, 'T'] : v >= 1e9 ? [1e9, 'B'] : v >= 1e6 ? [1e6, 'M'] : [1e3, 'K'];
     const x = v / d; return '$' + (x >= 100 ? x.toFixed(0) : x >= 10 ? x.toFixed(1) : x.toFixed(2)) + u;
   }
+  // a market cap in Korean units: 1.71e12 -> "1.71조 달러", 3.29e11 -> "3,290억 달러"
+  function fmtCapKo(v) {
+    if (!(v > 0)) return '';
+    if (v >= 1e12) { const x = v / 1e12; return `${x >= 100 ? nf(Math.round(x)) : x >= 10 ? x.toFixed(1) : x.toFixed(2)}조 달러`; }
+    if (v >= 1e8) return `${nf(v >= 1e10 ? Math.round(v / 1e9) * 10 : Math.round(v / 1e8))}억 달러`;
+    return `${nf(Math.max(1, Math.round(v / 1e4)))}만 달러`;
+  }
   const EX_NAME = { U: '업비트', B: '빗썸', N: '바이낸스' };
   const exNames = (c) => ['U', 'B', 'N'].filter((x) => c.x.includes(x)).map((x) => EX_NAME[x]).join(' · ') || '업비트·빗썸·바이낸스 미상장(직접 추가한 종목)';
   const nameOf = (c) => c.k || c.n;
+  // what a coin is, as sentences (the hover title of its button on a solo page)
+  function coinTitle(c) {
+    const name = c.k && c.k !== c.n ? `${c.k}(${c.n})` : c.n, ex = ['U', 'B', 'N'].filter((x) => c.x.includes(x)).map((x) => EX_NAME[x]);
+    const cap = fmtCapKo(c.mc);
+    return `${name}입니다. 시가총액은 ${c.r}위${cap ? `(${cap})` : ''}이고, ${ex.length ? `${ex.join(', ')}에 상장되어 있습니다.` : '업비트, 빗썸, 바이낸스에는 상장되어 있지 않습니다.'}`;
+  }
+  // "BTC와 ETH": the particle after a symbol follows how its last letter or digit is read (엘, 엠, 엔, 알, 영, 일, 삼,
+  // 육, 칠, 팔 end in a consonant)
+  const waGwa = (sym) => (/[LMNR013678]$/i.test(String(sym)) ? '과' : '와');
   const agoText = (ago) => (ago === 0 ? '마지막 봉' : ago + '봉 전');
   const GROUP_START = new Set([TFS.indexOf('8D'), TFS.indexOf('1M')]); // 1D…1W | 8D…3W | 1M…12M, as the screener table
   const tvInterval = (tf) => { const m = /^(\d+)([DWM])$/.exec(tf); return (m[1] === '1' ? '' : m[1]) + m[2]; };
@@ -345,13 +415,16 @@ const BE = (() => {
     else if (t.unless && t.unless.length) out += ` 다만 ${t.unless.map(groupText).join('이거나 ')}이면 나오지 않습니다.`;
     return out;
   }
-  // where the bar in progress stands against one trigger (VIEW.fire): "조건가 P (pct) · 닿은 뒤 Q (qpct)에서 마감해도 충족"
+  // where the bar in progress stands against one trigger (VIEW.fire). The price named is the LEVEL that decides, with
+  // its comparison: "조건가 60,492.4 초과 (+3.9%)" for a level the close has to go beyond (a waiting 9), "이하" / "이상"
+  // for a level that counts itself; then, when the bar may close elsewhere after it has been there, the level of the
+  // close: "조건가 1,620.24 이하 (−24.0%) · 종가 기준 2,076.68 이하 (−2.6%)".
+  const levelText = (c, fallback) => (c ? `${fmtPrice(c.v)} ${OP_KO[c.op] || c.op}` : fmtPrice(fallback));
   function fireText(f) {
     if (!f) return '가격이 한 번 움직여서는 충족되지 않음';
     if (f.now) return '지금 값으로 충족';
-    const head = `조건가 ${fmtPrice(f.p)} (${fmtPct(f.pct)})`;
-    if (f.q === f.p) return head + ' · 이 값에서 마감하면 충족';
-    return head + (f.qpct === 0 ? ' · 닿은 뒤 지금 가격에서 마감해도 충족' : ` · 닿은 뒤 ${fmtPrice(f.q)} (${fmtPct(f.qpct)})에서 마감해도 충족`);
+    const head = `조건가 ${levelText(f.pc, f.p)} (${fmtPct(f.pct)})`;
+    return f.q === f.p || f.qpct === 0 ? head : `${head} · 종가 기준 ${levelText(f.qc, f.q)} (${fmtPct(f.qpct)})`;
   }
 
   // ---------- marks ----------
@@ -374,7 +447,15 @@ const BE = (() => {
       if (py + h > innerHeight - 8) py = y - h - pad;
       tipEl.style.left = Math.max(8, Math.min(px, vw - w - 8)) + 'px'; tipEl.style.top = Math.max(8, Math.min(py, innerHeight - h - 8)) + 'px';
     },
+    // the same box where the caller says: place(width, height) -> [left, top], held inside the window
+    at(content, place) {
+      if (typeof content === 'string') tipEl.innerHTML = content; else tipEl.replaceChildren(...content);
+      tipEl.style.display = 'block'; tipEl.style.left = '0px'; tipEl.style.top = '0px';   // measured where the window's edge does not hold its width back
+      const w = tipEl.offsetWidth, h = tipEl.offsetHeight, vw = document.documentElement.clientWidth, [px, py] = place(w, h);
+      tipEl.style.left = Math.max(8, Math.min(px, vw - w - 8)) + 'px'; tipEl.style.top = Math.max(8, Math.min(py, innerHeight - h - 8)) + 'px';
+    },
     hide() { tipEl.style.display = 'none'; },
+    el: tipEl,
   };
 
   // ---------- canvas ----------
@@ -422,7 +503,7 @@ const BE = (() => {
   }
 
   // ---------- shared state, kept in localStorage when it is there ----------
-  const VIEWS = [['chart', 'Bird eye 차트'], ['market', '시장 조감도'], ['sheet', '여러 TF 한 장'], ['ladder', 'TF 사다리']];
+  const VIEWS = [['chart', 'Bird Eye 차트'], ['market', '시장 조감도'], ['sheet', '여러 TF 한 장'], ['ladder', 'TF 사다리']];
   // view null: not chosen yet (the first route takes the address, or the first view the page has)
   const state = { view: null, key: 'a', keys: { chart: 'a', market: 'a', sheet: 'a', ladder: 'a' }, coin: 'btc', fam: FAMS.slice(), note: true, v: {} };
   try {
@@ -532,7 +613,7 @@ const BE = (() => {
   // what this page was built with: the variants of a view, and the views that have one
   const keysOf = (view) => ['a', 'b'].filter((key) => VARIANTS.has(view + '-' + key));
   const liveViews = () => VIEWS.map((v) => v[0]).filter((v) => keysOf(v).length > 0);
-  let ACTIVE = null, ROOT = null;
+  let ACTIVE = null, ROOT = null, SOLO = false;
   const hashOf = (view, key, slug) => `#${view}-${key}` + (view !== 'market' && slug ? `-${slug}` : '');
   const hrefOf = (view, slug) => hashOf(view, state.keys[view] || 'a', slug || state.coin);
   function go(to) {
@@ -584,6 +665,7 @@ const BE = (() => {
       vs.append(b);
     }
     $('coinCtl').hidden = !perCoin;
+    if (SOLO) { syncSolo(c); return; }
     const note = $('vnote'), v = VARIANTS.get(state.view + '-' + state.key); note.replaceChildren();
     state.note = noteOpen(v);
     note.hidden = !state.note || !v;
@@ -618,6 +700,52 @@ const BE = (() => {
     }
     $('famSeg').querySelectorAll('button').forEach((b) => b.setAttribute('aria-pressed', String(famOn(Number(b.dataset.fam)))));
   }
+  // ---------- the solo shell: one app bar row, 설명 over the page ----------
+  function syncSolo(c) {
+    $('coinHead').hidden = true;
+    for (const b of $('quick').children) b.setAttribute('aria-pressed', String(!!c && b.dataset.slug === c.slug));
+    if (c) {
+      $('coinInput').value = ''; $('coinInput').placeholder = `${c.s} · 심볼 검색`;
+      const i = WITH_DATA.indexOf(c);
+      $('prevCoin').disabled = i <= 0; $('nextCoin').disabled = i < 0 || i >= WITH_DATA.length - 1;
+      $('soloSym').textContent = c.s;
+      $('soloPrice').replaceChildren('최근 종가 ', el('b', 'num', c.lc != null ? fmtPrice(c.lc) : '없음'));
+      const a = $('soloTv'); a.hidden = !c.usd; if (c.usd) a.href = tvUrl(c.usd, '1D');
+    }
+    $('famSeg').querySelectorAll('button').forEach((b) => b.setAttribute('aria-pressed', String(famOn(Number(b.dataset.fam)))));
+  }
+  function setNote(open) {
+    const note = $('vnote'), btn = $('noteBtn'), v = ACTIVE;
+    state.note = !!open && !!v;
+    note.hidden = !state.note; btn.setAttribute('aria-expanded', String(state.note));
+    if (!state.note) { note.replaceChildren(); return; }
+    let nodes = null;
+    try { nodes = v.help ? v.help() : null; } catch (e) { console.error(e); }
+    if (!nodes) { const p = el('p'); p.innerHTML = v.blurb || ''; nodes = [el('h2', null, v.name), p]; }
+    note.replaceChildren(...nodes); note.scrollTop = 0;
+  }
+  function startSolo() {
+    document.documentElement.classList.add('be-solo');
+    try { document.title = 'TD Bird Eye'; } catch (e) { /* a host that keeps its own title */ }
+    const brand = document.querySelector('.brand'); if (brand.firstChild && brand.firstChild.nodeType === 3) brand.firstChild.nodeValue = 'TD Bird Eye ';
+    $('asof').textContent = `${DATA.lastClosedDay} 마감 기준`;
+    const bar = $('soloBar'), pick = document.querySelector('#coinCtl .coinpick'), info = el('span', 'solo-info');
+    const sym = el('b', 'sym num'); sym.id = 'soloSym';
+    const price = el('span'); price.id = 'soloPrice';
+    const asof = el('span', 'asof2', `${DATA.lastClosedDay} 마감`);   // (shown where the app bar has no room for the name's own date)
+    const tv = el('a', null, 'TradingView 차트 ↗'); tv.id = 'soloTv'; tv.target = '_blank'; tv.rel = 'noopener';
+    info.append(sym, price, asof, tv);
+    pick.setAttribute('role', 'group'); pick.setAttribute('aria-label', '종목');
+    const btn = $('noteBtn'); btn.textContent = '설명'; btn.title = '이 화면을 읽는 법과 조작법을 엽니다.';
+    bar.append(pick, info, btn); bar.hidden = false;
+    $('shellCtl').hidden = true; $('coinHead').hidden = true;
+    const note = $('vnote'); note.hidden = true; note.setAttribute('role', 'region'); note.setAttribute('aria-label', '설명');
+    state.note = false;   // closed at first, whatever was saved for the study's own description panel
+    btn.addEventListener('click', () => setNote(!state.note));
+    // the panel closes with Esc, and with a press anywhere outside it
+    document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && state.note) { setNote(false); btn.focus(); } });
+    document.addEventListener('pointerdown', (e) => { if (state.note && !note.contains(e.target) && !btn.contains(e.target)) setNote(false); }, true);
+  }
   function start() {
     readColors();
     $('asof').textContent = `${DATA.lastClosedDay} 마감 · 실제 데이터`;
@@ -630,12 +758,17 @@ const BE = (() => {
       const name = VIEWS.find((x) => x[0] === live[0])[1], last = name.charCodeAt(name.length - 1);
       const obj = last >= 0xAC00 && last <= 0xD7A3 && (last - 0xAC00) % 28 ? '을' : '를';   // 차트를, 한 장을
       const count = ['', '한', '두', '세', '네', '다섯', '여섯', '일곱', '여덟'][WITH_DATA.length];
-      intro = few && count ? `이 페이지는 ${name}${obj} ${WITH_DATA.map((c) => c.s).join(', ')} ${count} 종목에 먼저 적용한 시안입니다.` : `이 페이지는 ${name} 시안입니다.`;
+      const syms = WITH_DATA.map((c) => c.s), list = syms.length === 2 ? `${syms[0]}${waGwa(syms[0])} ${syms[1]}` : syms.join(', ');
+      intro = few && count ? `이 페이지는 ${name}${obj} ${list} ${count} 종목에 먼저 적용한 시안입니다.` : `이 페이지는 ${name} 시안입니다.`;
     }
     $('lead').textContent = `${intro} ${counted}`;
+    // one view with one variant that asks for the first screen: the solo shell
+    const only = live.length === 1 && keysOf(live[0]).length === 1 ? VARIANTS.get(`${live[0]}-${keysOf(live[0])[0]}`) : null;
+    SOLO = !!(only && only.solo);
+    if (SOLO) startSolo();
     const barH = () => document.documentElement.style.setProperty('--appbar-h', document.querySelector('.appbar').offsetHeight + 'px');
     barH(); addEventListener('resize', barH);
-    $('noteBtn').addEventListener('click', () => { state.note = !state.note; state.noteSaved = state.note; save(); syncShell(); renderActive('resize'); });
+    if (!SOLO) $('noteBtn').addEventListener('click', () => { state.note = !state.note; state.noteSaved = state.note; save(); syncShell(); renderActive('resize'); });
     // a tab per view the page has; one view needs no tabs
     const tabs = $('tabs');
     for (const [v, name] of VIEWS) { if (!live.includes(v)) continue; const a = el('a', null, name); a.dataset.view = v; tabs.append(a); }
@@ -657,10 +790,11 @@ const BE = (() => {
     for (const s of few ? WITH_DATA.map((c) => c.slug) : ['btc', 'eth', 'xrp', 'sol', 'doge', 'pepe']) {
       const c = coinBySlug(s); if (!c || !c.t) continue;
       const b = el('button', null, c.s); b.type = 'button'; b.dataset.slug = c.slug; b.addEventListener('click', () => go({ coin: c.slug })); $('quick').append(b);
+      if (SOLO) b.title = coinTitle(c);   // the names, the rank and the exchanges are not on the screen there
     }
     const fs = $('famSeg');
     for (const f of FAMS) {
-      const b = el('button'); b.type = 'button'; b.dataset.fam = f; b.title = TD.FAMILY_NAMES[f];
+      const b = el('button'); b.type = 'button'; b.dataset.fam = f; b.title = SOLO ? `${FAM_NAME[f]} 계열을 켜거나 끕니다.` : TD.FAMILY_NAMES[f];
       const i = el('i'); i.style.background = `var(--f${f})`; b.append(i, document.createTextNode(FAM_NAME[f]));
       b.addEventListener('click', () => { state.fam = famOn(f) ? state.fam.filter((x) => x !== f) : [...state.fam, f].sort(); save(); syncShell(); renderActive('fam'); });
       fs.append(b);
@@ -672,12 +806,19 @@ const BE = (() => {
     try { matchMedia('(prefers-color-scheme: dark)').addEventListener('change', retheme); } catch (e) { /* old browsers */ }
     new MutationObserver(retheme).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
     if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => renderActive('theme'));
+    // A font that a canvas asks for after that moment (a weight first drawn when the data has arrived) loads
+    // unnoticed and leaves canvas text in the fallback font, measured with its widths. A variant that says lateFonts
+    // is drawn again whenever fonts have finished loading (the draw may ask for another font; that ends when all are
+    // in). The others keep the one draw above: they close their tooltip when they draw, and a tooltip can itself be
+    // the first use of a font.
+    if (document.fonts && document.fonts.addEventListener) { let ft = 0; document.fonts.addEventListener('loadingdone', () => { clearTimeout(ft); ft = setTimeout(() => { if (ACTIVE && ACTIVE.lateFonts) renderActive('theme'); }, 50); }); }
     addEventListener('scroll', () => tip.hide(), { passive: true });
     route();
     try { performance.mark('be-ready'); } catch (e) { /* no performance API */ }
   }
 
   return { DATA, TFS, OPT, LAST, DAY, COINS, WITH_DATA, FAMS, FAM_NAME, FAM_CODE, FAM_COLOR, SETUP_COLOR, BUY, SELL, SIDE, ARROW, C,
+    get solo() { return SOLO; }, get famCtl() { return $('famCtl'); }, fmtCapKo,
     EX_NAME, GROUP_START, el, esc, iso, nf, fmtPrice, fmtPct, fmtCap, exNames, nameOf, agoText, tvUrl, chipHTML, chipEl, tip, setupCanvas,
     padArray, labelPrice, labelColor, LABEL_FONT, dateTicks, seg, state, save, vstate, famOn, coin, coinBySlug, findCoins, lastBar, isLate,
     trigText, fireText, isDark, hrefOf, side, detail, register, go, openCoin, start };
