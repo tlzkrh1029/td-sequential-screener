@@ -1,9 +1,9 @@
 {
- "fetchedAt": "2026-11-14T06:42:56.457Z",
- "lastClosedDay": "2026-11-13",
+ "fetchedAt": "2026-11-15T06:48:02.437Z",
+ "lastClosedDay": "2026-11-14",
  "mode": "full",
  "loggedIn": false,
- "seconds": 335,
+ "seconds": 285,
  "total": 563,
  "ok": 563,
  "removed": 0,
@@ -11,29 +11,89 @@
  "failed": [],
  "revised": [
   {
-   "id": "CRYPTO:GRVTUSD",
+   "id": "CRYPTO:KITEUSD",
    "changed": 1,
-   "first": "2026-11-12"
+   "first": "2026-11-13"
   },
   {
-   "id": "CRYPTO:CGPTUSD",
+   "id": "CRYPTO:HNTUSD",
    "changed": 1,
-   "first": "2026-11-12"
+   "first": "2026-11-13"
   },
   {
-   "id": "CRYPTO:ROAUSD",
+   "id": "CRYPTO:KAITOUSD",
    "changed": 1,
-   "first": "2026-11-12"
+   "first": "2026-11-13"
   },
   {
-   "id": "CRYPTO:LMUSD",
+   "id": "CRYPTO:NIULAIUSD",
    "changed": 1,
-   "first": "2026-11-12"
+   "first": "2026-11-13"
+  },
+  {
+   "id": "CRYPTO:MEGAEUSD",
+   "changed": 1,
+   "first": "2026-11-13"
+  },
+  {
+   "id": "CRYPTO:GWEIUSD",
+   "changed": 1,
+   "first": "2026-11-13"
+  },
+  {
+   "id": "CRYPTO:GGRAUSD",
+   "changed": 1,
+   "first": "2026-11-13"
+  },
+  {
+   "id": "CRYPTO:MANTRAUSD",
+   "changed": 1,
+   "first": "2026-11-13"
+  },
+  {
+   "id": "CRYPTO:DOGS2USD",
+   "changed": 1,
+   "first": "2026-11-13"
+  },
+  {
+   "id": "CRYPTO:FIDAUSD",
+   "changed": 1,
+   "first": "2026-11-13"
+  },
+  {
+   "id": "CRYPTO:CYBERCUSD",
+   "changed": 1,
+   "first": "2026-11-13"
+  },
+  {
+   "id": "CRYPTO:PUFFERUSD",
+   "changed": 1,
+   "first": "2026-11-13"
+  },
+  {
+   "id": "CRYPTO:NEWTUSD",
+   "changed": 1,
+   "first": "2026-11-13"
+  },
+  {
+   "id": "CRYPTO:BOBAUSD",
+   "changed": 1,
+   "first": "2026-11-13"
+  },
+  {
+   "id": "CRYPTO:BLAST2USD",
+   "changed": 1,
+   "first": "2026-11-13"
   },
   {
    "id": "CRYPTO:REIUSD",
    "changed": 1,
    "first": "2026-11-12"
+  },
+  {
+   "id": "CRYPTO:LWAUSD",
+   "changed": 1,
+   "first": "2026-11-13"
   }
  ],
  "oddRanges": [
