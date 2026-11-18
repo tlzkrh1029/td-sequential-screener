@@ -1,9 +1,9 @@
 {
- "fetchedAt": "2026-11-17T08:06:45.080Z",
- "lastClosedDay": "2026-11-16",
+ "fetchedAt": "2026-11-18T07:42:20.260Z",
+ "lastClosedDay": "2026-11-17",
  "mode": "full",
  "loggedIn": false,
- "seconds": 404,
+ "seconds": 278,
  "total": 563,
  "ok": 563,
  "removed": 0,
@@ -11,90 +11,49 @@
  "failed": [],
  "revised": [
   {
-   "id": "CRYPTO:AERODUSD",
-   "changed": 0,
-   "weeks": 1
-  },
-  {
-   "id": "CRYPTO:ETHFIUSD",
+   "id": "CRYPTO:ZROLUSD",
    "changed": 1,
-   "first": "2026-11-15"
+   "first": "2026-11-16"
   },
   {
-   "id": "CRYPTO:FLUID3USD",
-   "changed": 3,
-   "first": "2022-01-22",
-   "weeks": 2
-  },
-  {
-   "id": "CRYPTO:SFPUSD",
+   "id": "CRYPTO:APTOUSD",
    "changed": 1,
-   "first": "2026-11-15"
+   "first": "2026-11-16"
   },
   {
-   "id": "CRYPTO:ZKSYUSD",
+   "id": "CRYPTO:LUNCUSD",
    "changed": 1,
-   "first": "2026-11-14"
+   "first": "2026-11-16"
   },
   {
-   "id": "CRYPTO:HNTUSD",
-   "changed": 0,
-   "weeks": 1
-  },
-  {
-   "id": "CRYPTO:KSMUSD",
+   "id": "CRYPTO:TUSD",
    "changed": 1,
-   "first": "2026-11-13"
+   "first": "2026-11-16"
   },
   {
-   "id": "CRYPTO:WINUSD",
+   "id": "CRYPTO:ONEUSD",
    "changed": 1,
-   "first": "2026-11-13"
+   "first": "2026-11-16"
   },
   {
-   "id": "CRYPTO:MOCAVUSD",
+   "id": "CRYPTO:EULUSD",
    "changed": 1,
-   "first": "2026-11-15"
+   "first": "2026-11-16"
   },
   {
-   "id": "CRYPTO:SAHARAUSD",
+   "id": "CRYPTO:HUNTUSD",
    "changed": 1,
-   "first": "2026-11-14"
+   "first": "2026-11-16"
   },
   {
-   "id": "CRYPTO:SPACECOUSD",
+   "id": "CRYPTO:RAREUSD",
    "changed": 1,
-   "first": "2026-11-14"
+   "first": "2026-11-16"
   },
   {
-   "id": "CRYPTO:MTLUSD",
-   "changed": 0,
-   "weeks": 1
-  },
-  {
-   "id": "CRYPTO:BIRBMOUSD",
+   "id": "CRYPTO:BLAST2USD",
    "changed": 1,
-   "first": "2026-11-15"
-  },
-  {
-   "id": "CRYPTO:BMTBUSD",
-   "changed": 1,
-   "first": "2026-11-14"
-  },
-  {
-   "id": "CRYPTO:TLMUSD",
-   "changed": 1,
-   "first": "2026-11-15"
-  },
-  {
-   "id": "CRYPTO:MBXUSD",
-   "changed": 1,
-   "first": "2026-11-15"
-  },
-  {
-   "id": "CRYPTO:XPLAUSD",
-   "changed": 1,
-   "first": "2026-11-15"
+   "first": "2026-11-16"
   }
  ],
  "oddRanges": [
