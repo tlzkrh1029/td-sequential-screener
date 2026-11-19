@@ -1,9 +1,9 @@
 {
- "fetchedAt": "2026-11-18T07:42:20.260Z",
- "lastClosedDay": "2026-11-17",
+ "fetchedAt": "2026-11-19T07:38:31.259Z",
+ "lastClosedDay": "2026-11-18",
  "mode": "full",
  "loggedIn": false,
- "seconds": 278,
+ "seconds": 584,
  "total": 563,
  "ok": 563,
  "removed": 0,
@@ -11,14 +11,14 @@
  "failed": [],
  "revised": [
   {
-   "id": "CRYPTO:ZROLUSD",
+   "id": "CRYPTO:VETUSD",
    "changed": 1,
-   "first": "2026-11-16"
+   "first": "2026-11-17"
   },
   {
-   "id": "CRYPTO:APTOUSD",
+   "id": "CRYPTO:SEIUSD",
    "changed": 1,
-   "first": "2026-11-16"
+   "first": "2026-11-17"
   },
   {
    "id": "CRYPTO:LUNCUSD",
@@ -26,14 +26,9 @@
    "first": "2026-11-16"
   },
   {
-   "id": "CRYPTO:TUSD",
+   "id": "CRYPTO:HUMAUSD",
    "changed": 1,
-   "first": "2026-11-16"
-  },
-  {
-   "id": "CRYPTO:ONEUSD",
-   "changed": 1,
-   "first": "2026-11-16"
+   "first": "2026-11-17"
   },
   {
    "id": "CRYPTO:EULUSD",
@@ -41,19 +36,59 @@
    "first": "2026-11-16"
   },
   {
+   "id": "CRYPTO:WAXPUSD",
+   "changed": 1,
+   "first": "2026-11-17"
+  },
+  {
+   "id": "CRYPTO:BIGTIMEUSD",
+   "changed": 1,
+   "first": "2026-11-17"
+  },
+  {
+   "id": "CRYPTO:BREVUSD",
+   "changed": 1,
+   "first": "2026-11-17"
+  },
+  {
+   "id": "CRYPTO:POKTUSD",
+   "changed": 1,
+   "first": "2026-11-17"
+  },
+  {
    "id": "CRYPTO:HUNTUSD",
-   "changed": 1,
+   "changed": 2,
    "first": "2026-11-16"
   },
   {
-   "id": "CRYPTO:RAREUSD",
+   "id": "CRYPTO:DODOUSD",
    "changed": 1,
-   "first": "2026-11-16"
+   "first": "2026-11-17"
   },
   {
-   "id": "CRYPTO:BLAST2USD",
+   "id": "CRYPTO:CPCLUUSD",
    "changed": 1,
-   "first": "2026-11-16"
+   "first": "2026-11-17"
+  },
+  {
+   "id": "CRYPTO:AVAILUSD",
+   "changed": 1,
+   "first": "2026-11-17"
+  },
+  {
+   "id": "CRYPTO:SANTOSUSD",
+   "changed": 1,
+   "first": "2026-11-17"
+  },
+  {
+   "id": "CRYPTO:SWAPUSD",
+   "changed": 1,
+   "first": "2026-11-17"
+  },
+  {
+   "id": "CRYPTO:SIXUSD",
+   "changed": 1,
+   "first": "2026-11-17"
   }
  ],
  "oddRanges": [
