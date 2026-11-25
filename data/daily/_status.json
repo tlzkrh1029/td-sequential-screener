@@ -1,9 +1,9 @@
 {
- "fetchedAt": "2026-11-24T10:04:56.777Z",
- "lastClosedDay": "2026-11-23",
+ "fetchedAt": "2026-11-25T08:50:08.307Z",
+ "lastClosedDay": "2026-11-24",
  "mode": "full",
  "loggedIn": false,
- "seconds": 550,
+ "seconds": 245,
  "total": 563,
  "ok": 563,
  "removed": 0,
@@ -11,31 +11,39 @@
  "failed": [],
  "revised": [
   {
+   "id": "CRYPTO:XRPUSD",
+   "changed": 1,
+   "first": "2026-11-23"
+  },
+  {
    "id": "CRYPTO:LINKUSD",
+   "changed": 2,
+   "first": "2026-11-22"
+  },
+  {
+   "id": "CRYPTO:TRUMPOFUSD",
    "changed": 1,
-   "first": "2026-11-22",
-   "weeks": 1
+   "first": "2026-11-23"
   },
   {
-   "id": "CRYPTO:DOTUSD",
-   "changed": 0,
-   "weeks": 1
-  },
-  {
-   "id": "CRYPTO:ICPUSD",
-   "changed": 0,
-   "weeks": 1
-  },
-  {
-   "id": "CRYPTO:AERODUSD",
+   "id": "CRYPTO:BTTUSD",
    "changed": 1,
-   "first": "2026-11-22",
-   "weeks": 1
+   "first": "2026-11-22"
+  },
+  {
+   "id": "CRYPTO:GNOUSD",
+   "changed": 1,
+   "first": "2026-11-23"
+  },
+  {
+   "id": "CRYPTO:FLOKIUSD",
+   "changed": 1,
+   "first": "2026-11-21"
   },
   {
    "id": "CRYPTO:USELESSUSD",
-   "changed": 0,
-   "weeks": 1
+   "changed": 1,
+   "first": "2026-11-23"
   },
   {
    "id": "CRYPTO:TRACUSD",
@@ -43,20 +51,14 @@
    "first": "2026-11-20"
   },
   {
-   "id": "CRYPTO:NEOUSD",
+   "id": "CRYPTO:IMXUSD",
    "changed": 1,
-   "first": "2026-11-21"
-  },
-  {
-   "id": "CRYPTO:CHZUSD",
-   "changed": 4,
-   "first": "2026-11-19"
+   "first": "2026-11-23"
   },
   {
    "id": "CRYPTO:BATUSD",
-   "changed": 3,
-   "first": "2026-11-20",
-   "weeks": 1
+   "changed": 2,
+   "first": "2026-11-19"
   },
   {
    "id": "CRYPTO:GLMUSD",
@@ -65,39 +67,42 @@
    "weeks": 1
   },
   {
-   "id": "CRYPTO:WUSD",
+   "id": "CRYPTO:SKRSUSD",
    "changed": 1,
-   "first": "2026-11-22"
+   "first": "2026-11-23"
   },
   {
-   "id": "CRYPTO:COWUSD",
+   "id": "CRYPTO:PEAQUSD",
    "changed": 1,
-   "first": "2026-11-22"
+   "first": "2026-11-23"
+  },
+  {
+   "id": "CRYPTO:WUSD",
+   "changed": 1,
+   "first": "2026-11-23"
+  },
+  {
+   "id": "CRYPTO:GASUSD",
+   "changed": 1,
+   "first": "2026-11-23"
+  },
+  {
+   "id": "CRYPTO:BERAUSD",
+   "changed": 1,
+   "first": "2026-11-23"
+  },
+  {
+   "id": "CRYPTO:BANANAFOUSD",
+   "changed": 1,
+   "first": "2026-11-23"
   },
   {
    "id": "CRYPTO:ZILUSD",
    "changed": 1,
-   "first": "2026-11-19"
+   "first": "2026-11-23"
   },
   {
-   "id": "CRYPTO:IONEUSD",
-   "changed": 1,
-   "first": "2026-11-22"
-  },
-  {
-   "id": "CRYPTO:CTCUSD",
-   "changed": 112,
-   "first": "2022-01-07",
-   "months": 4,
-   "weeks": 17
-  },
-  {
-   "id": "CRYPTO:TOSHI3USD",
-   "changed": 1,
-   "first": "2026-11-21"
-  },
-  {
-   "id": "CRYPTO:REQUSD",
+   "id": "CRYPTO:TRBUSD",
    "changed": 1,
    "first": "2026-11-22"
   },
@@ -107,50 +112,55 @@
    "first": "2026-11-21"
   },
   {
-   "id": "CRYPTO:FLOCKUSD",
+   "id": "CRYPTO:PCIUSD",
    "changed": 1,
-   "first": "2026-11-22"
+   "first": "2026-11-23"
+  },
+  {
+   "id": "CRYPTO:MMTMOUSD",
+   "changed": 1,
+   "first": "2026-11-23"
+  },
+  {
+   "id": "CRYPTO:ACXUSD",
+   "changed": 1,
+   "first": "2026-11-23"
   },
   {
    "id": "CRYPTO:ATAPUSD",
-   "changed": 1,
+   "changed": 2,
    "first": "2026-11-22"
   },
   {
-   "id": "CRYPTO:ICNTUSD",
+   "id": "CRYPTO:KNCUSD",
    "changed": 1,
-   "first": "2026-11-21"
+   "first": "2026-11-23"
   },
   {
    "id": "CRYPTO:MOVRUSD",
    "changed": 1,
-   "first": "2026-11-19"
+   "first": "2026-11-23"
+  },
+  {
+   "id": "CRYPTO:HOMEDUSD",
+   "changed": 1,
+   "first": "2026-11-23"
   },
   {
    "id": "CRYPTO:INITUSD",
    "changed": 3,
-   "first": "2026-11-19"
+   "first": "2026-11-20"
   },
   {
    "id": "CRYPTO:BREVUSD",
-   "changed": 2,
-   "first": "2026-11-19"
-  },
-  {
-   "id": "CRYPTO:ACEFUSD",
    "changed": 1,
-   "first": "2026-11-22"
+   "first": "2026-11-20"
   },
   {
    "id": "CRYPTO:ENSOUSD",
-   "changed": 1,
+   "changed": 2,
    "first": "2026-11-22",
    "weeks": 1
-  },
-  {
-   "id": "CRYPTO:DIAUSD",
-   "changed": 1,
-   "first": "2026-11-22"
   },
   {
    "id": "CRYPTO:GAMEBUSD",
@@ -158,24 +168,30 @@
    "first": "2026-11-22"
   },
   {
-   "id": "CRYPTO:PUFFERUSD",
+   "id": "CRYPTO:SPELLUSD",
+   "changed": 1,
+   "first": "2026-11-23"
+  },
+  {
+   "id": "CRYPTO:MBLUSD",
+   "changed": 4,
+   "first": "2026-11-20",
+   "weeks": 1
+  },
+  {
+   "id": "CRYPTO:RAREUSD",
    "changed": 1,
    "first": "2026-11-22"
   },
   {
-   "id": "CRYPTO:BTRBITUSD",
+   "id": "CRYPTO:ELSAHUSD",
    "changed": 1,
    "first": "2026-11-22"
-  },
-  {
-   "id": "CRYPTO:ERACUSD",
-   "changed": 1,
-   "first": "2026-11-21"
   },
   {
    "id": "CRYPTO:TLMUSD",
-   "changed": 3,
-   "first": "2026-11-20"
+   "changed": 4,
+   "first": "2026-11-19"
   },
   {
    "id": "CRYPTO:AVAILUSD",
@@ -183,19 +199,19 @@
    "first": "2026-11-22"
   },
   {
-   "id": "CRYPTO:DAOUSD",
+   "id": "CRYPTO:QUICKSUSD",
    "changed": 1,
-   "first": "2026-11-22"
+   "first": "2026-11-23"
   },
   {
-   "id": "CRYPTO:TKOUSD",
+   "id": "CRYPTO:A8USD",
    "changed": 1,
-   "first": "2026-11-22"
+   "first": "2026-11-23"
   },
   {
-   "id": "CRYPTO:ZRCZUSD",
+   "id": "CRYPTO:REIUSD",
    "changed": 1,
-   "first": "2026-11-22"
+   "first": "2026-11-23"
   }
  ],
  "oddRanges": [
